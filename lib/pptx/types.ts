@@ -1,0 +1,29 @@
+export type Box = { x: number; y: number; width: number; height: number };
+export type SourceNode = {
+  key: string; slidePath: string; id: string; name: string; kind: string;
+  parentId: string | null; children: string[]; box: Box | null;
+  childBox: Box | null; rotation: number; flipH: boolean; flipV: boolean;
+  text: string; marked: boolean;
+  geometry?: { preset: string; adjustments: Record<string, number> };
+  hasImage?: boolean; hasTextBody?: boolean; dataKind?: 'table' | 'chart';
+};
+export type SourceSlide = { path: string; nodes: SourceNode[] };
+export type GroupMember = {key:string;box:Box;rotation:number;flipH:boolean;flipV:boolean};
+export type NativeGroup = {box:Box;members:GroupMember[];released:GroupMember[]};
+export type ElementPatch = { name?: string; box?: Box; text?: string; group?:NativeGroup };
+export type Patches = Record<string, ElementPatch>;
+export type Paint = { type: string; value?: unknown; [key: string]: unknown };
+export type RenderElement = {
+  id: string; type: string; left: number; top: number; width: number; height: number;
+  rotate?: number; order?: number; name?: string; elements?: RenderElement[];
+  content?: string; fill?: Paint; borderColor?: string; borderWidth?: number;
+  borderType?: string; isFlipH?: boolean; isFlipV?: boolean; base64?: string;
+  blob?: string; src?: string; ref?: string; geom?: string; shapType?: string;
+  path?: string; pathViewBox?: {x:number;y:number;width:number;height:number}; vAlign?: string;
+  textInset?: { l?: number; r?: number; t?: number; b?: number };
+  autoFit?: { type: string; fontScale?: number }; rect?: Record<string, number>;
+  [key: string]: unknown;
+};
+export type RenderSlide = { fill?: Paint; elements: RenderElement[]; layoutElements?: RenderElement[]; note?: string };
+export type RenderDeck = { slides: RenderSlide[]; size: { width: number; height: number }; themeColors: string[] };
+export type LoadedTemplate = { bytes: ArrayBuffer; slides: SourceSlide[]; deck: RenderDeck; sha256: string; mappingWarnings: string[] };
