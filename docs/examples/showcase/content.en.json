@@ -1,0 +1,41 @@
+{
+  "disclosure": "All companies, content and business data are fictional demonstrations.",
+  "cases": [
+    {
+      "id": "growth", "title": "Business growth review", "photo": 2,
+      "chapters": ["Growth plan", "Market reach", "Key metrics"],
+      "cover": ["Northstar / Demo report", "Growth", "Review", "A practical review of customer value, reach and results.", "Growth team", "Demo only"],
+      "text": ["Scale what works", "Validate value", "Use interviews and small pilots to test a real need before offering the same solution to more teams.", "Grow with care", "Connect the product, onboarding and customer success so each new project builds on a repeatable method.", "Fictional data for demonstration purposes."],
+      "listTitle": "Three growth moves",
+      "listSummary": "Focus on proven needs and repeatable value.",
+      "items": [
+        ["Research", "Learn why customers buy and when they would use it again."],
+        ["Product", "Help new users finish a useful task and see value sooner."],
+        ["Channels", "Turn proven delivery examples into reusable sales material."]
+      ],
+      "image": ["Build market reach", "From pilot to scale", "Start with a clear use case, then make onboarding repeatable.", "Keep the design familiar so the team can focus on decisions."],
+      "chart": {"categories": ["Q1", "Q2", "Q3", "Q4"], "series": [{"name": "New clients (orgs)", "values": [12, 18, 27, 36]}]},
+      "chartText": ["Quarterly clients", "Unit: orgs", "Demo data: new clients rise from 12 to 36 across four quarters."],
+      "closing": ["Keep growing", "Build on what works. All content and data are fictional."]
+    },
+    {
+      "id": "efficiency", "title": "Operational efficiency plan", "photo": 3,
+      "chapters": ["Process", "Teamwork", "Key metrics"],
+      "cover": ["Fieldwork / Demo report", "Lean Ops", "Delivery", "A plan for clearer ownership and smoother delivery.", "Delivery team", "Demo only"],
+      "text": ["Make work repeat", "Set the standard", "Define the input, owner and acceptance criteria for key steps so the team spends less time asking again.", "Improve teamwork", "Capture common decisions in a shared playbook, then use feedback from each delivery to improve it.", "Fictional data for demonstration purposes."],
+      "listTitle": "Five team moves",
+      "listSummary": "Turn process goals into clear team actions.",
+      "items": [
+        ["Intake", "Collect requests in one place with clear acceptance rules."],
+        ["Ownership", "Assign an owner at each handoff to cut waiting and rework."],
+        ["Templates", "Reuse tested material and steps for recurring deliverables."],
+        ["Visibility", "Share task status and risks early so others can prepare."],
+        ["Review", "Find the next bottleneck and make each lesson reusable."]
+      ],
+      "image": ["Make teamwork flow", "One shared playbook", "Give every handoff clear inputs, an owner and a shared definition of done.", "Capture what works so new team members can deliver with less rework."],
+      "chart": {"categories": ["Q1", "Q2", "Q3", "Q4"], "series": [{"name": "Delivery cycle (days)", "values": [32, 27, 21, 16]}]},
+      "chartText": ["Delivery cycle", "Unit: days", "Demo data: the average delivery cycle falls from 32 to 16 days."],
+      "closing": ["Make work flow", "Make every handoff clearer. All content and data are fictional."]
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+{
+  "title": "运营提效计划",
+  "slides": [
+    {
+      "templateId": "slide_001",
+      "nodes": {
+        "text_1": "云序咨询 · 演示案例",
+        "text_2": "运营提效计划",
+        "text_3": "让协作更有秩序",
+        "text_4": "围绕交付标准、团队协作与流程改进，把分散经验转化为稳定的服务能力。",
+        "text_5": "运营与交付团队",
+        "text_6": "虚构示例",
+        "image_1": {
+          "path": "TEMPLATE_ASSETS/image3.jpeg"
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_003",
+      "nodes": {
+        "text_1": "内容导航",
+        "text_2": "围绕三个章节展开，所有案例内容与经营数据均为演示虚构。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ],
+      "lists": {
+        "list_1": [
+          {
+            "text_1": "交付流程复盘"
+          },
+          {
+            "text_1": "团队协作实践"
+          },
+          {
+            "text_1": "效率指标分析"
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "交付流程复盘",
+        "text_2": "从目标与关键动作出发，形成可以持续复用的工作方法。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_008",
+      "nodes": {
+        "text_1": "把重复工作变成稳定流程",
+        "text_2": "先统一标准",
+        "text_3": "梳理交付过程中的关键节点，明确输入、责任人与验收方式，减少反复确认。",
+        "text_4": "再改善协作",
+        "text_5": "将常见问题沉淀为可查阅的操作指引，让团队在同一套规则下持续改进。",
+        "text_6": "所有效率数据均为演示虚构，不代表真实服务水平。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_030",
+      "nodes": {
+        "text_1": "五个动作提升团队交付效率",
+        "text_2": "将目标分解为可以执行的工作项，让流程改善落到每次交付。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ],
+      "lists": {
+        "list_1": [
+          {
+            "text_1": "统一入口",
+            "text_2": "把分散的需求收集到同一入口，补齐背景与验收要求后再进入执行阶段。"
+          },
+          {
+            "text_1": "明确责任",
+            "text_2": "为每个关键节点确定负责人，减少任务在多人之间往返传递的等待时间。"
+          },
+          {
+            "text_1": "沉淀模板",
+            "text_2": "整理高频交付内容与操作步骤，让团队能够复用经过验证的材料和方法。"
+          },
+          {
+            "text_1": "过程可见",
+            "text_2": "让任务状态、依赖关系和风险及时可见，帮助协作方提前准备下一步工作。"
+          },
+          {
+            "text_1": "持续复盘",
+            "text_2": "结合实际反馈定期检查瓶颈，把一次改进转化为下一轮交付的默认流程。"
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "团队协作实践",
+        "text_2": "用真实的任务场景组织团队行动，让协作目标保持一致。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_026",
+      "nodes": {
+        "text_1": "让跨团队协作拥有共同语言",
+        "text_2": "从个人经验走向团队方法",
+        "text_3": "通过共享流程与交付模板，让新成员可以理解任务背景，并按统一标准开展工作。",
+        "text_4": "把每次协作中形成的经验留在团队里，持续降低沟通与接入成本。",
+        "image_1": {
+          "path": "TEMPLATE_ASSETS/image3.jpeg"
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "效率指标分析",
+        "text_2": "用清晰的数据表达变化，为下一阶段行动提供讨论依据。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_022",
+      "nodes": {
+        "text_1": "平均交付周期逐季缩短",
+        "text_2": "单位：天",
+        "text_3": "虚构演示数据：从 32 天降至 16 天，同一图表版式承载另一组指标与趋势。",
+        "chart_1": {
+          "categories": [
+            "一季度",
+            "二季度",
+            "三季度",
+            "四季度"
+          ],
+          "series": [
+            {
+              "name": "平均交付周期（天）",
+              "values": [
+                32,
+                27,
+                21,
+                16
+              ]
+            }
+          ]
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_032",
+      "nodes": {
+        "text_1": "把改善沉淀为日常能力",
+        "text_2": "让规则帮助团队协作，让经验支持下一次交付。以上内容与数据均为演示虚构。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    }
+  ]
+}

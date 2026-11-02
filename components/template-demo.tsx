@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { Locale } from '@/lib/i18n';
-import template from '@/lib/demo/template.json';
+import {track,trackOnce} from '@/lib/analytics/browser';
+import templateZh from '@/lib/demo/template.json';
+import templateEn from '@/lib/demo/template.en.json';
 import { editorCopy } from '@/lib/pptx/copy';
 import { loadTemplate } from '@/lib/pptx/load';
 import { writePptx } from '@/lib/pptx/xml';
@@ -21,7 +23,7 @@ import { addedMarkName, allowedMarkTypes, removedMarkName } from '@/lib/pptx/mar
 
 const emptyHistory={past:[] as Patches[],current:{} as Patches,future:[] as Patches[]};
 export default function TemplateDemo({locale}:{locale:Locale}) {
-  const t=editorCopy[locale];
+  const t=editorCopy[locale],template=locale==='en'?templateEn:templateZh;
   const [baseModel,setModel]=useState<LoadedTemplate|null>(null),[phase,setPhase]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState('');
   const [page,setPage]=useState(0),[selected,setSelected]=useState<string|null>(null),[markedOnly,setMarkedOnly]=useState(false);
   const [history,setHistory]=useState(emptyHistory),[transient,setTransient]=useState<Patches|null>(null);
@@ -143,7 +145,7 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
       const response=await fetch(template.downloadUrl);if(!response.ok)throw new Error(`TEMPLATE_HTTP_${response.status}`);
       const result=await loadTemplate(await response.arrayBuffer());
       if(result.sha256!==template.sha256)throw new Error('TEMPLATE_HASH_MISMATCH');
-      setModel(result);setSelected(result.slides[0].nodes.find(n=>n.marked)?.key||null);setPhase(1);
+      trackOnce('workbench-started','workbench_started');setModel(result);setSelected(result.slides[0].nodes.find(n=>n.marked)?.key||null);setPhase(1);
     }catch(cause){console.error('[SlideLatch] demo.load.failed',cause);setError(t.loadError);}finally{setLoading(false);}
   }
   function addMark(){
@@ -239,8 +241,8 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
       if(downloadRef.current)URL.revokeObjectURL(downloadRef.current);
       const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'}));downloadRef.current=url;setDownload(url);
       setExportReport(`${check.length} ${locale==='zh'?'页':'slides'} · ${count} ${t.changed}`);setPhase(2);exportDialogRef.current?.close();
-      console.info('[SlideLatch] template.export.complete',{slides:check.length,patches:count,bytes:bytes.byteLength});
-    }catch(cause){console.error('[SlideLatch] template.export.failed',cause);setError(t.error);}finally{setExporting(false);}
+      track('workbench_export_succeeded');console.info('[SlideLatch] template.export.complete',{slides:check.length,patches:count,bytes:bytes.byteLength});
+    }catch(cause){track('workbench_export_failed',{reason:'write_failed'});console.error('[SlideLatch] template.export.failed',cause);setError(t.error);}finally{setExporting(false);}
   }
   return <section id="demo" className="demo-wrap interactive-demo pptx-workbench reveal" aria-labelledby="demo-title">
     <div id="workflow" className="demo-intro"><h2 id="demo-title">{t.title}</h2><p>{t.note}</p></div>
@@ -281,7 +283,7 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
         </div>
         {(issues.length>0||model.mappingWarnings.length>0)&&<div className="pptx-validation" role="status"><strong>{model.mappingWarnings.length?t.mapping:t.validation}</strong><span>{[...model.mappingWarnings,...issues.map(issueText)].slice(0,4).join(' · ')}</span></div>}
       </>}
-      {phase===2&&download&&<div className="pptx-export-result"><span className="export-check">✓</span><h3>{t.done}</h3><p>{t.doneHint}</p><small>{exportReport}</small><a className="button button-primary" href={download} download="minimal-business-slidelatch.pptx">{t.download} ↓</a><button className="demo-reset" onClick={()=>setPhase(1)}>{t.back} ↗</button></div>}
+      {phase===2&&download&&<div className="pptx-export-result"><span className="export-check">✓</span><h3>{t.done}</h3><p>{t.doneHint}</p><small>{exportReport}</small><a className="button button-primary" href={download} onClick={()=>track('workbench_download_clicked')} download={locale==='en'?'minimal-business-slidelatch-en.pptx':'minimal-business-slidelatch.pptx'}>{t.download} ↓</a><button className="demo-reset" onClick={()=>setPhase(1)}>{t.back} ↗</button></div>}
       {error&&<div className="pptx-error-message" role="alert">{error}{!model&&<button onClick={openTemplate}>{t.retry}</button>}</div>}
     </div>
     <dialog ref={exportDialogRef} className="pptx-export-confirm" aria-labelledby="export-confirm-title" onCancel={event=>{if(exporting)event.preventDefault()}}>

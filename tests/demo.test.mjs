@@ -34,7 +34,7 @@ test('invalid fields can be located and resetting creates fresh unsaved state', 
   assert.equal(second.text_2.dynamic, true);
 });
 
-test('original template download is byte-identical to the selected compiled template', () => {
+test('bundled template download matches its declared hash and cover metadata', () => {
   const bytes = readFileSync(new URL(`../public${template.downloadUrl}`, import.meta.url));
   assert.equal(createHash('sha256').update(bytes).digest('hex'), template.sha256);
   assert.equal(template.slideCount, 33);

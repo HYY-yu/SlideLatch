@@ -7,7 +7,7 @@
 
 ## 当前进度
 
-已完成产品方向、需求草案、初步研究和基于 Cruip Open 的中英文 landing 与纯前端 PPTX 标记工作台首版。极简商务 33 页已支持标记与布局调整、PPTX 写回；用户试点待开展。
+已完成产品方向、需求草案、初步研究和基于 Cruip Open 的中英文 landing 与纯前端 PPTX 标记工作台首版。极简商务 33 页已支持标记与布局调整、PPTX 写回；新增两份真实生成报告的文本、动态列表、图片和原生图表对比，支持静态预览与完整 PPTX 下载。中文和英文分别提供 33 页模板、两份 10 页案例和对应下载，节点 ID 与 DSL 标记保持一致；用户试点待开展。
 
 ## 文档
 
@@ -19,6 +19,8 @@
 | [用户验证](docs/validation-plan.md) | 招募、访谈、试点和评估指标 |
 | [竞品研究](docs/competitor-research.md) | 竞品能力、需求线索及来源 |
 | [品牌与域名](docs/naming-and-domains.md) | 品牌文案、名称取舍与核查记录 |
+| [支持与事件分析](docs/design/engagement-analytics.md) | 点赞、调查邀请、试用入口、PostHog 配置与 Tally Popup |
+| [真实生成对比](docs/design/generated-showcase.md) | 两份预生成案例、重建脚本与文件验收 |
 | [PPTX 工作台](docs/design/pptx-workbench.md) | 纯前端解析、SVG、标记与布局写回 |
 | [Web PPT 编辑引擎](docs/research/web-pptx-editors.md) | 候选库、原对象映射、许可与实验标准 |
 
@@ -40,3 +42,7 @@ npm run dev
 打开 `http://127.0.0.1:3000`，支持 `/zh` 与 `/en`。
 
 页面文案、结构与样式入口见 [Landing 维护说明](docs/design/landing.md)，模板来源见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+
+## 事件分析与试用申请
+
+PostHog 配置见 [.env.example](.env.example)，未配置时不发送数据，本地默认不上报。Tally 已接入公开表单 `7XqVaa`，点击申请后使用 Popup 填写，表单答案不传给 PostHog；事件合同与接入说明见 [支持与事件分析](docs/design/engagement-analytics.md)。

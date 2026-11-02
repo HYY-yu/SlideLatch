@@ -1,0 +1,133 @@
+/* Gray-white product surface. Original PPT artwork and Tally form styles remain native. */
+:root[data-theme='light'] {
+ color-scheme:light;
+ --background:#f5f6f8;
+ --muted:#687183;
+ --accent:#6852ce;
+ --surface:#fff;
+ --surface-soft:#f0f2f5;
+ --line:#dfe3ea;
+ --ink:#242936;
+}
+html[data-theme='light'] {
+ body { color:var(--ink); }
+ ::selection { background:#ddd5fb; color:#30234f; }
+ a:focus-visible,button:focus-visible { outline-color:#8267d2; }
+ .nav-bar { background:#fffffff2; border-color:#e0e3eb; box-shadow:0 4px 22px #27334a05; }
+ .nav-link,.language-switch { color:#596175; }
+ .nav-link:hover,.footer a:hover { color:#5941ad; }
+ .button-primary { background:linear-gradient(180deg,#6c55d8,#5b44c3); border-color:#5b44c3; box-shadow:inset 0 1px #ffffff22,0 3px 10px #6149be12; color:#fff; }
+ .button-primary:hover { background:linear-gradient(180deg,#735bdd,#644acb); box-shadow:0 5px 18px #6149be24; }
+ .button-secondary { background:#f1f2f6; border-color:#dbe0e8; color:#586174; box-shadow:none; }
+ .hero::before { background:radial-gradient(ellipse at 55% 20%,#e7e4f359,transparent 65%); }
+ .hero-illustration { opacity:.14; filter:saturate(.55); }
+ .eyebrow { color:#73609f; }
+ .hero-copy h1 span { background:linear-gradient(100deg,#383748,#6d55b9 60%,#75649b); background-clip:text; color:transparent; }
+ .early-access,.footer { border-color:var(--line); }
+ .early-access::before { background:radial-gradient(ellipse at top,#e8e3f52b,transparent 65%); }
+ .early-access > p:not(.eyebrow),.footer > a:last-child { color:#687183; }
+ .demo-wrap::before { background:#dcd6ee27; }
+ .demo-intro > p { color:#687183; }
+ .demo-workspace { background:var(--surface); border-color:#d9dee7; box-shadow:0 12px 40px -22px #26324a26; }
+ .demo-stepper { background:#f7f8fa; border-color:var(--line); }
+ .demo-stepper button,.demo-stepper button span { color:#6a7283; }
+ .demo-stepper button[aria-current] { color:#53418c; border-bottom-color:#8970cd; }
+ .demo-stepper button[aria-current] span { color:#7258b0; }
+ .demo-stepper button:disabled { color:#969eac; }
+ .pptx-choose > div { background:#eef1f3; }
+ .pptx-choose aside { background:#fff; border-color:var(--line); }
+ .pptx-choose aside > p:not(.eyebrow),.pptx-choose small { color:#687183; }
+ .upload-disabled { border-color:#d4d9e2; background:#f3f4f7; color:#8a92a1; }
+ .pptx-toolbar { background:#fff; border-color:var(--line); }
+ .pptx-toolbar span { color:#697285; }
+ .pptx-toolbar button:not(.button) { color:#6a559a; }
+ .pptx-toolbar button.pptx-next-step { color:#644b9e; background:#f1edf9; border-color:#bcaed9; }
+ .pptx-toolbar button.pptx-next-step:hover:not(:disabled) { background:#e9e1f7; border-color:#aa95ce; }
+ .pptx-thumbnails { background:#f0f2f5; scrollbar-color:#ccd0db transparent; }
+ .pptx-thumbnails > button { border-color:#d4dae3; }
+ .pptx-thumbnails > button.active { border-color:#8e72cc; box-shadow:0 0 0 1px #8e72cc44; }
+ .thumb-number { color:#71798b; }
+ .pptx-thumbnails > button.active .thumb-number { color:#7054aa; }
+ .pptx-stage { background:#e9edf2; border-color:#dce1e8; }
+ .pptx-canvas { box-shadow:0 5px 18px #25344c13; }
+ .pptx-properties,.pptx-inspector-body { background:#fff; }
+ .pptx-properties,.pptx-inspector-body,.pptx-object-list { scrollbar-color:#cbd0dc transparent; }
+ .pptx-objects-region { background:#f8f9fb; border-color:var(--line); }
+ .pptx-object-header label,.pptx-node-content label,.pptx-length-control label,.pptx-checkbox,.pptx-two-fields label { color:#687183; }
+ .pptx-object-list button { color:#606a7c; }
+ .pptx-object-list button:hover { background:#eff0f5; }
+ .pptx-object-list button[aria-pressed='true'] { background:#ebe5f7; color:#5d428f; }
+ .object-kind { color:#8a6db6; }
+ .pptx-list-tree { background:#f4f7f504; }
+ .pptx-list-tree summary::before { color:#727b8a; }
+ .pptx-inspector-body h3:not(:first-child),.pptx-reset-actions { border-color:var(--line); }
+ .pptx-inspector-body select,.pptx-inspector-body input:not([type='checkbox']),.pptx-node-content textarea { color:#394254; background:#fafbfc; border-color:#d6dce5; outline-color:#9981cb; }
+ .pptx-node-content p { color:#4f5b6d; }
+ .pptx-node-content .coordinate-hint,.coordinate-hint { color:#6c7789; }
+ .pptx-inspector-body .pptx-number-stepper input { border-color:#d6dce5; }
+ .pptx-number-stepper { border-color:#d6dce5; background:#fafbfc; }
+ .pptx-number-stepper button { color:#77628f; }
+ .pptx-number-stepper button:hover:not(:disabled) { background:#eee7f7; color:#63458c; }
+ .pptx-apply { background:#f0ebf8; border-color:#d4c7e8; color:#674b94; }
+ .pptx-remove-mark { color:#816193; }
+ .pptx-remove-mark:hover { color:#a04769; }
+ .pptx-canvas-actions { background:#f7f8fa; border-color:#c7ceda; }
+ .pptx-canvas-actions button { color:#5e687b; }
+ .pptx-canvas-actions button:hover:not(:disabled) { color:#654b97; }
+ .pptx-canvas-actions .action-divider { background:#cdd3df; }
+ .canvas-patch-count { color:#727d8f; }
+ .pptx-stage-status .pptx-status-identity,.pptx-stage-status .pptx-status-hint,.pptx-stage-status .pptx-status-dimensions { color:#677487; }
+ .pptx-list-settings { background:#f5faf7; border-color:#b7d4c7; }
+ .pptx-list-count,.pptx-list-range { border-color:#d2d9e2; background:#fff; }
+ .pptx-list-count button,.pptx-list-range button { background:#edf1f3; color:#766187; }
+ .pptx-list-badge { background:#fffffff2; }
+ .pptx-empty,.pptx-export-result p,.pptx-export-result small { color:#687183; }
+ .export-check { color:#7956b0; }
+ .pptx-validation { background:#fff6e6; border-color:#e6cfa8; color:#8a672b; }
+ .pptx-error,.pptx-error-message { color:#af4b43; }
+ .pptx-error-message { border-color:var(--line); }
+ .pptx-error-message button { color:#73519e; }
+ .demo-reset { color:#755b9f; }
+ .template-overview,.overview-header,.pptx-export-confirm,.showcase-lightbox,.trial-dialog { color:var(--ink); background:#fff; border-color:#d7dce6; box-shadow:0 22px 70px #26334c24; }
+ .overview-header { border-color:var(--line); box-shadow:none; }
+ .overview-header a,.showcase-close,.trial-dialog-close { color:#70568e; }
+ .overview-header button { color:#606b7d; background:#f1f3f7; border-color:var(--line); }
+ .overview-header button:hover { background:#e6e9f1; color:#44345d; }
+ .pptx-export-confirm > p,.trial-dialog p { color:#677285; }
+ .template-overview::backdrop,.pptx-export-confirm::backdrop,.showcase-lightbox::backdrop,.trial-dialog::backdrop { background:#31394666; backdrop-filter:blur(5px); }
+ .trial-dialog-symbol { color:#7954b0; border-color:#d8cce8; background:#f3eef9; }
+ .pptx-number-scrubber { background:#ffffffef; border-color:#d3c4e9; color:#765790; box-shadow:0 10px 35px #4e355422; }
+ .scrubber-label,.scrubber-direction { color:#80668d; }
+ .scrubber-track { background:repeating-linear-gradient(to bottom,#ab92bf55 0 1px,transparent 1px 9px); }
+ .pptx-number-scrubber strong { color:#67447f; }
+ .showcase-case-switch button { background:#fff; border-color:#dce0e8; color:#70778a; }
+ .showcase-case-switch button[aria-pressed='true'] { background:#ede7f8; border-color:#c4b5df; color:#61468f; }
+ .showcase-feature-switch { border-color:var(--line); }
+ .showcase-feature-switch button { color:#737b8b; }
+ .showcase-feature-switch button[aria-pressed='true'] { color:#634b93; border-bottom-color:#9479be; }
+ .showcase-comparison figcaption { color:#424c5e; }
+ .showcase-comparison figcaption small { color:#737d8f; }
+ .showcase-slide { border-color:#dbe1e6; box-shadow:0 3px 12px #27334a05; }
+ .showcase-download { background:#f5f1fa; border-color:#c9b8dd; color:#705090; }
+ .showcase-download span { color:#887096; }
+ .showcase-detail { border-color:var(--line); }
+ .support-intro p,.support-count { color:#737d8f; }
+ .support-button { background:linear-gradient(135deg,#fff1f6,#fcf6fa); border-color:#e9ccd8; color:#995770; }
+ .support-button:hover { background:#fce9f0; border-color:#dca9bf; }
+ .support-heart { color:#db638d; }
+ .support-button output { color:#a26581; border-color:#e6ccd8; }
+ .survey-invitation { background:#fff; border-color:#ddd2e9; box-shadow:0 8px 32px #402e4b18; }
+ .survey-invitation::after { background:#fff; border-color:#ddd2e9; }
+ .survey-invitation p { color:#4e435b; }
+ .survey-invitation button { color:#81768b; }
+ .survey-invitation button:first-child { color:#775397; }
+}
+.trial-recovery-actions { display:flex; align-items:center; flex-wrap:wrap; gap:18px; margin-top:22px; }
+.trial-recovery-actions .button { margin-top:0; }
+.trial-recovery-actions > a { font-size:12px; color:#73529b; }
+
+/* White Galaxy surface matches the light page; keep the original dark heading. */
+html[data-theme='light'] {
+ .hero::before { background:none; }
+ .hero-copy { color:var(--ink); }
+}

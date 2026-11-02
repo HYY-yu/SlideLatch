@@ -9,7 +9,7 @@ const zh = {
   description: '配置已有 PPT 模板，保留设计，让你常用的 AI 按规则准备内容。',
   primary: '看看生成效果',
   earlyTitle: '下一份报告，从你的设计开始。',
-  earlyDescription: '首批模板试用正在准备中。', earlyStatus: '试用申请即将开放',
+  earlyDescription: '告诉我你的使用场景，申请首批模板试用。',
   footerTop: '回到顶部',
 };
 type Copy = { [K in keyof typeof zh]: (typeof zh)[K] };
@@ -20,7 +20,7 @@ const en: Copy = {
   description: 'Configure an existing PowerPoint template. Keep your design and use your favorite AI to prepare content within its rules.',
   primary: 'See it in action',
   earlyTitle: 'Your next report starts with your design.',
-  earlyDescription: 'We’re preparing our first template trials.', earlyStatus: 'Trial applications opening soon',
+  earlyDescription: 'Tell us about your use case and apply for the first template trials.',
   footerTop: 'Back to top',
 };
 export const copy: Record<Locale, Copy> = { zh, en };

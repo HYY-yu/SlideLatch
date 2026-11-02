@@ -30,3 +30,28 @@ Node.js 22.6+，首次运行 `npm install`。
 - `npm start`：生产预览。
 
 首版没有外部模型调用、用户数据收集或文件上传。标记及几何写回发生在浏览器，可下载新 PPTX；报名与用户模板上传尚未接入。
+
+
+2026-11-02：工作台前新增真实生成对比区，Hero 主按钮指向 `#results`。详细输入、生成链路、静态素材与验收见 [真实生成对比](generated-showcase.md)。
+
+2026-11-02：生成对比后新增连续点赞与第 4 次调查邀请，导航/结果区/页尾提供直接试用入口。PostHog 显式事件接线、环境变量与 Tally 申请流程见 [支持与事件分析](engagement-analytics.md)。
+
+
+### 2026-11-02 灰白色与真实试用申请
+
+整体使用浅灰底、白色面板和深灰文字，紫色保留为主操作与选中强调，点赞保留柔和粉色。`app/light-theme.css` 以 `html[data-theme="light"]` 提高覆盖优先级，统一导航、Hero、案例对比、工作台、属性表单、确认弹框与提示气泡；字体、布局和动效保持现有实现。PPT 内部原生配色不做过滤或重绘，表单保持 Tally 自身白色样式。
+
+视觉目标：干净、克制的灰白产品工作台。内容顺序仍为产品承诺、真实生成对比、配置工作台、试用申请。动效保留标题入场、案例切换与随机爱心，减少动态效果设置继续生效。
+
+Tally 使用公开表单 `7XqVaa` 的 modal Popup 替换待开放提示，真实打开回调和提交回调分别入分析事件。加载失败提供重试及公开表单直达；详细生命周期与隐私合同见 [支持与事件分析](engagement-analytics.md)。
+
+### 2026-11-02 Galaxy 白底紫色星空
+
+Dark Veil 的深色幕光与浅色页面不搭，按用户反馈改为 [React Bits Galaxy](https://reactbits.dev/backgrounds/galaxy)。视觉目标：白底、紫色星点，缓慢漂移与轻微闪烁，鼠标经过时星点避让。标题恢复深色，内容顺序与灰白工作台保持一致。
+
+- `components/galaxy.tsx` 基于官方 TypeScript 源码、原生 WebGL2，无新增依赖；许可见 [React Bits 许可](../licenses/react-bits-LICENSE.md)。
+- `components/galaxy-background.tsx` 延迟加载，设置 `lightMode`、不透明白底及紫色 palette，关闭点击加速和飞入效果，DPR 限制为 1，使用 3 层星点。
+- 背景不拦截点击，不收集指针坐标；离屏/后台暂停，动态响应系统减少动态效果偏好；WebGL 不可用时保留白底并记录 Warn，上下文恢复后重建。
+- 修正上游在 Strict Mode 清理时主动丢失上下文的问题；新增渲染生命周期、窗口缩放、减少动态效果与无 WebGL 合同测试。
+
+验收：TypeScript 检查、40 项单测通过；Chrome 桌面与 390px 移动预览正常，鼠标移动后控制台无 Warn/Error。浅色 shader 保留紫色色相，避免上游 ink 映射让星点偏黑；最终预览：[白底紫星](previews/galaxy-white-purple.jpg)。

@@ -1,0 +1,170 @@
+{
+  "title": "Business growth review",
+  "slides": [
+    {
+      "templateId": "slide_001",
+      "nodes": {
+        "text_1": "Northstar / Demo report",
+        "text_2": "Growth",
+        "text_3": "Review",
+        "text_4": "A practical review of customer value, reach and results.",
+        "text_5": "Growth team",
+        "text_6": "Demo only",
+        "image_1": {
+          "path": "TEMPLATE_ASSETS/image2.jpeg"
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_003",
+      "nodes": {
+        "text_1": "Contents",
+        "text_2": "Three chapters. Fictional content and data."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ],
+      "lists": {
+        "list_1": [
+          {
+            "text_1": "Growth plan"
+          },
+          {
+            "text_1": "Market reach"
+          },
+          {
+            "text_1": "Key metrics"
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "Growth plan",
+        "text_2": "Build repeatable methods around clear goals and practical actions."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_008",
+      "nodes": {
+        "text_1": "Scale what works",
+        "text_2": "Validate value",
+        "text_3": "Use interviews and small pilots to test a real need before offering the same solution to more teams.",
+        "text_4": "Grow with care",
+        "text_5": "Connect the product, onboarding and customer success so each new project builds on a repeatable method.",
+        "text_6": "Fictional data for demonstration purposes."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_030",
+      "nodes": {
+        "text_1": "Three growth moves",
+        "text_2": "Focus on proven needs and repeatable value."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ],
+      "lists": {
+        "list_1": [
+          {
+            "text_1": "Research",
+            "text_2": "Learn why customers buy and when they would use it again."
+          },
+          {
+            "text_1": "Product",
+            "text_2": "Help new users finish a useful task and see value sooner."
+          },
+          {
+            "text_1": "Channels",
+            "text_2": "Turn proven delivery examples into reusable sales material."
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "Market reach",
+        "text_2": "Use shared goals and clear handoffs to help teams work together."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_026",
+      "nodes": {
+        "text_1": "Build market reach",
+        "text_2": "From pilot to scale",
+        "text_3": "Start with a clear use case, then make onboarding repeatable.",
+        "text_4": "Keep the design familiar so the team can focus on decisions.",
+        "image_1": {
+          "path": "TEMPLATE_ASSETS/image2.jpeg"
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "Key metrics",
+        "text_2": "Use clear measures to guide the next round of team decisions."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_022",
+      "nodes": {
+        "text_1": "Quarterly clients",
+        "text_2": "Unit: orgs",
+        "text_3": "Demo data: new clients rise from 12 to 36 across four quarters.",
+        "chart_1": {
+          "categories": [
+            "Q1",
+            "Q2",
+            "Q3",
+            "Q4"
+          ],
+          "series": [
+            {
+              "name": "New clients (orgs)",
+              "values": [
+                12,
+                18,
+                27,
+                36
+              ]
+            }
+          ]
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_032",
+      "nodes": {
+        "text_1": "Keep growing",
+        "text_2": "Build on what works. All content and data are fictional."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    }
+  ]
+}

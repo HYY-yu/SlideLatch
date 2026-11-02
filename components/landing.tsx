@@ -2,9 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import GalaxyBackground from './galaxy-background';
 import { copy, type Locale } from '@/lib/i18n';
 import TemplateDemo from './template-demo';
+import GeneratedShowcase from './generated-showcase';
+import Analytics from './analytics';
+import {EngagementProvider,TrialButton} from './engagement';
 
 function Arrow({ diagonal = false }: { diagonal?: boolean }) {
   return <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d={diagonal ? 'M6 18 18 6M6 6h12v12' : 'M4 12h16m-6-6 6 6-6 6'} /></svg>;
@@ -24,11 +27,12 @@ export default function Landing({ locale }: { locale: Locale }) {
     return () => observer.disconnect();
   }, []);
 
-  return <div ref={pageRef} id="top" className={`site locale-${locale}`}>
+  return <EngagementProvider locale={locale}><Analytics locale={locale}/><div ref={pageRef} id="top" className={`site locale-${locale}`}>
+    <GalaxyBackground />
     <header className="header-shell">
       <nav className="nav-bar" aria-label={locale === 'zh' ? '主导航' : 'Main navigation'}>
         <Link href={`/${locale}`} aria-label="SlideLatch"><Brand /></Link>
-        <div className="nav-actions">
+        <div className="nav-actions"><TrialButton locale={locale} source="header" className="nav-link nav-trial"/>
           <a href="#workflow" className="nav-link">{t.navWorkflow}</a>
           <Link className="language-switch" href={locale === 'zh' ? '/en' : '/zh'} hrefLang={locale === 'zh' ? 'en' : 'zh-CN'} aria-label={t.languageLabel}>
             <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>
@@ -41,23 +45,23 @@ export default function Landing({ locale }: { locale: Locale }) {
 
     <main>
       <section className="hero" aria-labelledby="hero-title">
-        <Image className="hero-illustration" src="/images/page-illustration.svg" alt="" width={846} height={594} priority aria-hidden="true" />
         <div className="hero-copy">
           <p className="eyebrow hero-enter">{t.eyebrow}</p>
           <h1 id="hero-title" className="hero-enter">{t.title[0]}<br/><span>{t.title[1]}</span></h1>
           <div className="hero-actions hero-enter">
-            <a className="button button-primary" href="#demo">{t.primary}<Arrow /></a>
+            <a className="button button-primary" href="#results">{t.primary}<Arrow /></a>
           </div>
         </div>
 
-        <TemplateDemo locale={locale} />
+        <GeneratedShowcase locale={locale} />
+        <TemplateDemo key={locale} locale={locale} />
       </section>
 
       <section className="early-access section-shell reveal" aria-labelledby="early-title">
         <h2 id="early-title">{t.earlyTitle}</h2><p>{t.earlyDescription}</p>
-        <span className="coming-soon"><i/>{t.earlyStatus}</span>
+        <TrialButton locale={locale} source="footer"/>
       </section>
     </main>
     <footer className="footer section-shell"><Link href={`/${locale}`} aria-label="SlideLatch"><Brand /></Link><a href="#top">{t.footerTop}<span aria-hidden="true">↑</span></a></footer>
-  </div>;
+  </div></EngagementProvider>;
 }

@@ -1,0 +1,42 @@
+{
+  "templateSha256": "9b0db47e30356928b49a281de4e485cae158a57606ea2f259ec12c90a451b2a3",
+  "disclosure": "All companies, content and business data are fictional demonstrations.",
+  "versions": [
+    {
+      "id": "growth",
+      "title": "Business growth review",
+      "slideCount": 10,
+      "listCount": 3,
+      "sha256": "877202268f75f0ac93e290fea3d7e65a3bf4b3bc6b30836772b32b42f8a59cc2"
+    },
+    {
+      "id": "efficiency",
+      "title": "Operational efficiency plan",
+      "slideCount": 10,
+      "listCount": 5,
+      "sha256": "c22c2cc64f37190eecfd9f0f93eb8dfd8f51189b5a0316ae238b6e8cb4989367"
+    }
+  ],
+  "categories": [
+    {
+      "id": "text",
+      "sourcePage": 1,
+      "outputPage": 1
+    },
+    {
+      "id": "list",
+      "sourcePage": 30,
+      "outputPage": 5
+    },
+    {
+      "id": "image",
+      "sourcePage": 26,
+      "outputPage": 7
+    },
+    {
+      "id": "chart",
+      "sourcePage": 22,
+      "outputPage": 9
+    }
+  ]
+}

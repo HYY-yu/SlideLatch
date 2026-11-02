@@ -1,0 +1,42 @@
+{
+  "templateSha256": "b1f0a35501aeec636b7a8a9419f54009219a9ceefa91190b0157402ca6d8b601",
+  "disclosure": "以下内容与数据均为产品演示虚构示例，不代表真实企业经营表现。",
+  "versions": [
+    {
+      "id": "growth",
+      "title": "业务增长复盘",
+      "slideCount": 10,
+      "listCount": 3,
+      "sha256": "08a38d1289948575f50d039c7f9b6f08f5c327ac9bf42a0c75e87b6c373dc01b"
+    },
+    {
+      "id": "efficiency",
+      "title": "运营提效计划",
+      "slideCount": 10,
+      "listCount": 5,
+      "sha256": "a59d2c95d6464d35cf4162959fed26b01b2abe59f79ea00a9019ddedcdc2dbc8"
+    }
+  ],
+  "categories": [
+    {
+      "id": "text",
+      "sourcePage": 1,
+      "outputPage": 1
+    },
+    {
+      "id": "list",
+      "sourcePage": 30,
+      "outputPage": 5
+    },
+    {
+      "id": "image",
+      "sourcePage": 26,
+      "outputPage": 7
+    },
+    {
+      "id": "chart",
+      "sourcePage": 22,
+      "outputPage": 9
+    }
+  ]
+}

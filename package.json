@@ -12,6 +12,7 @@
   "dependencies": {
     "jszip": "^3.10.2",
     "next": "^15.1.11",
+    "posthog-js": "^1.444.0",
     "pptxtojson": "^2.2.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

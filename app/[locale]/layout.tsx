@@ -1,4 +1,5 @@
 import '../globals.css';
+import '../light-theme.css';
 import localFont from 'next/font/local';
 import { notFound } from 'next/navigation';
 import { isLocale } from '@/lib/i18n';
@@ -16,7 +17,7 @@ export default async function LocaleLayout({ children, params }: {
 }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  return <html lang={locale === 'zh' ? 'zh-CN' : 'en'}>
+  return <html data-theme="light" lang={locale === 'zh' ? 'zh-CN' : 'en'}>
     <body className={nacelle.variable}>{children}</body>
   </html>;
 }

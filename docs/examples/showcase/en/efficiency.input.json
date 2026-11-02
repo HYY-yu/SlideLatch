@@ -1,0 +1,178 @@
+{
+  "title": "Operational efficiency plan",
+  "slides": [
+    {
+      "templateId": "slide_001",
+      "nodes": {
+        "text_1": "Fieldwork / Demo report",
+        "text_2": "Lean Ops",
+        "text_3": "Delivery",
+        "text_4": "A plan for clearer ownership and smoother delivery.",
+        "text_5": "Delivery team",
+        "text_6": "Demo only",
+        "image_1": {
+          "path": "TEMPLATE_ASSETS/image3.jpeg"
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_003",
+      "nodes": {
+        "text_1": "Contents",
+        "text_2": "Three chapters. Fictional content and data."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ],
+      "lists": {
+        "list_1": [
+          {
+            "text_1": "Process"
+          },
+          {
+            "text_1": "Teamwork"
+          },
+          {
+            "text_1": "Key metrics"
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "Process",
+        "text_2": "Build repeatable methods around clear goals and practical actions."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_008",
+      "nodes": {
+        "text_1": "Make work repeat",
+        "text_2": "Set the standard",
+        "text_3": "Define the input, owner and acceptance criteria for key steps so the team spends less time asking again.",
+        "text_4": "Improve teamwork",
+        "text_5": "Capture common decisions in a shared playbook, then use feedback from each delivery to improve it.",
+        "text_6": "Fictional data for demonstration purposes."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_030",
+      "nodes": {
+        "text_1": "Five team moves",
+        "text_2": "Turn process goals into clear team actions."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ],
+      "lists": {
+        "list_1": [
+          {
+            "text_1": "Intake",
+            "text_2": "Collect requests in one place with clear acceptance rules."
+          },
+          {
+            "text_1": "Ownership",
+            "text_2": "Assign an owner at each handoff to cut waiting and rework."
+          },
+          {
+            "text_1": "Templates",
+            "text_2": "Reuse tested material and steps for recurring deliverables."
+          },
+          {
+            "text_1": "Visibility",
+            "text_2": "Share task status and risks early so others can prepare."
+          },
+          {
+            "text_1": "Review",
+            "text_2": "Find the next bottleneck and make each lesson reusable."
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "Teamwork",
+        "text_2": "Use shared goals and clear handoffs to help teams work together."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_026",
+      "nodes": {
+        "text_1": "Make teamwork flow",
+        "text_2": "One shared playbook",
+        "text_3": "Give every handoff clear inputs, an owner and a shared definition of done.",
+        "text_4": "Capture what works so new team members can deliver with less rework.",
+        "image_1": {
+          "path": "TEMPLATE_ASSETS/image3.jpeg"
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "Key metrics",
+        "text_2": "Use clear measures to guide the next round of team decisions."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_022",
+      "nodes": {
+        "text_1": "Delivery cycle",
+        "text_2": "Unit: days",
+        "text_3": "Demo data: the average delivery cycle falls from 32 to 16 days.",
+        "chart_1": {
+          "categories": [
+            "Q1",
+            "Q2",
+            "Q3",
+            "Q4"
+          ],
+          "series": [
+            {
+              "name": "Delivery cycle (days)",
+              "values": [
+                32,
+                27,
+                21,
+                16
+              ]
+            }
+          ]
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_032",
+      "nodes": {
+        "text_1": "Make work flow",
+        "text_2": "Make every handoff clearer. All content and data are fictional."
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    }
+  ]
+}

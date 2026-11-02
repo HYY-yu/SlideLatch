@@ -1,0 +1,170 @@
+{
+  "title": "业务增长复盘",
+  "slides": [
+    {
+      "templateId": "slide_001",
+      "nodes": {
+        "text_1": "星岸科技 · 演示案例",
+        "text_2": "业务增长复盘",
+        "text_3": "从验证到规模化",
+        "text_4": "聚焦产品价值、市场拓展与经营表现，用同一份设计呈现新的业务故事。",
+        "text_5": "增长与策略团队",
+        "text_6": "虚构示例",
+        "image_1": {
+          "path": "TEMPLATE_ASSETS/image2.jpeg"
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_003",
+      "nodes": {
+        "text_1": "内容导航",
+        "text_2": "围绕三个章节展开，所有案例内容与经营数据均为演示虚构。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ],
+      "lists": {
+        "list_1": [
+          {
+            "text_1": "增长成果复盘"
+          },
+          {
+            "text_1": "市场拓展实践"
+          },
+          {
+            "text_1": "经营指标分析"
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "增长成果复盘",
+        "text_2": "从目标与关键动作出发，形成可以持续复用的工作方法。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_008",
+      "nodes": {
+        "text_1": "让增长从单点突破走向协同",
+        "text_2": "先验证价值",
+        "text_3": "通过客户访谈与小范围试点确认真实需求，再将验证过的方案推广到更多团队。",
+        "text_4": "再扩大覆盖",
+        "text_5": "把产品体验、交付流程与客户成功连接起来，让每次新增合作都能沉淀可复用的方法。",
+        "text_6": "所有经营数据均为演示虚构，不构成实际业绩声明。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_030",
+      "nodes": {
+        "text_1": "下一阶段聚焦三个增长动作",
+        "text_2": "保持清晰的优先级，将资源投入已经完成需求验证的方向。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ],
+      "lists": {
+        "list_1": [
+          {
+            "text_1": "客户洞察",
+            "text_2": "围绕高频使用场景持续访谈，明确客户为什么购买以及何时愿意再次使用。"
+          },
+          {
+            "text_1": "产品打磨",
+            "text_2": "缩短首次使用路径，让新用户更快完成核心任务并看到可感知的价值。"
+          },
+          {
+            "text_1": "渠道协同",
+            "text_2": "统一销售与交付的信息口径，将已验证案例沉淀为可以重复使用的材料。"
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "市场拓展实践",
+        "text_2": "用真实的任务场景组织团队行动，让协作目标保持一致。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_026",
+      "nodes": {
+        "text_1": "让市场拓展建立在真实需求上",
+        "text_2": "从单个团队走向更多客户",
+        "text_3": "先在熟悉的业务场景建立可靠交付，再用标准流程降低新客户的接入成本。",
+        "text_4": "用一致的设计表达不同市场的机会，让团队把精力留给判断与行动。",
+        "image_1": {
+          "path": "TEMPLATE_ASSETS/image2.jpeg"
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_005",
+      "nodes": {
+        "text_1": "经营指标分析",
+        "text_2": "用清晰的数据表达变化，为下一阶段行动提供讨论依据。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_022",
+      "nodes": {
+        "text_1": "新增合作客户按季度增长",
+        "text_2": "单位：家",
+        "text_3": "虚构演示数据：从 12 家增至 36 家，用于展示原生图表数据与工作簿同步变化。",
+        "chart_1": {
+          "categories": [
+            "一季度",
+            "二季度",
+            "三季度",
+            "四季度"
+          ],
+          "series": [
+            {
+              "name": "新增合作客户（家）",
+              "values": [
+                12,
+                18,
+                27,
+                36
+              ]
+            }
+          ]
+        }
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    },
+    {
+      "templateId": "slide_032",
+      "nodes": {
+        "text_1": "让有效增长持续发生",
+        "text_2": "用清晰的目标连接团队，用可复用的方法扩大成果。以上内容与数据均为演示虚构。"
+      },
+      "sourceRefs": [
+        "fictional-showcase"
+      ]
+    }
+  ]
+}
