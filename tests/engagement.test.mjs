@@ -38,9 +38,9 @@ test('events queue during SDK loading, deduplicate views, and deliver only sanit
  const analytics=createAnalytics({enabled:true,debug:true},()=>loaded,log);
  analytics.captureOnce('landing','landing_viewed',{locale:'zh',email:'private@example.com'});
  analytics.captureOnce('landing','landing_viewed',{locale:'zh'});
- analytics.capture('support_clicked',{like_count:4,content:'PPT secret'});
+ analytics.capture('support_clicked',{like_count:4,content:'PPT secret',app:'duck_rush'});
  resolve({capture:(...args)=>delivered.push(args)});await analytics.start();
- assert.deepEqual(delivered,[['landing_viewed',{locale:'zh'}],['support_clicked',{like_count:4}]]);
+ assert.deepEqual(delivered,[['landing_viewed',{locale:'zh',app:'slidelatch'}],['support_clicked',{like_count:4,app:'slidelatch'}]]);
  assert.ok(!JSON.stringify(log.logs).includes('private@example.com'));assert.ok(!JSON.stringify(log.logs).includes('PPT secret'));
 });
 test('missing configuration and failed analytics initialization never block product interactions',async()=>{

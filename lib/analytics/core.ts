@@ -21,7 +21,8 @@ export function createAnalytics(config:AnalyticsConfig,loadClient:()=>Promise<An
   return pending;
  }
  function capture(event:AnalyticsEvent,properties:AnalyticsProperties={}){
-  const safe=safeProperties(properties);if(config.debug)logger.debug('[SlideLatch] analytics.event',{event,properties:safe});
+  // Share the PostHog project with other products without mixing their events.
+  const safe=safeProperties({...properties,app:'slidelatch'});if(config.debug)logger.debug('[SlideLatch] analytics.event',{event,properties:safe});
   if(!config.enabled||failed)return;
   if(client)deliver(event,safe);else{if(queue.length<100)queue.push({event,properties:safe});else logger.warn('[SlideLatch] analytics.queue.full',{event});void start();}
  }

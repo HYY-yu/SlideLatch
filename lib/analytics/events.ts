@@ -9,6 +9,7 @@ export type AnalyticsProperties=Record<string,unknown>;
 export function safeProperties(input:AnalyticsProperties):Record<string,string|number>{
  const output:Record<string,string|number>={};
  const enums:Record<string,readonly string[]>={
+  app:['slidelatch'],
   locale:['zh','en'],entry_point:['header','results','footer','support_survey'],case_id:['growth','efficiency','original'],
   feature:['text','list','image','chart'],outcome:['submitted','abandoned'],reason:['tally_load_failed','write_failed'],environment:['development','production','test'],
  };
