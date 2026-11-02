@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://slidelatch.app/sitemap.xml
