@@ -1,20 +1,22 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Landing from '@/components/landing';
-import { copy, isLocale, locales } from '@/lib/i18n';
+import { isLocale, locales } from '@/lib/i18n';
+import { seoCopy } from '@/lib/seo-copy';
 
 export const dynamicParams = false;
 export function generateStaticParams() { return locales.map(locale => ({ locale })); }
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
-  const content = copy[locale];
+  const content = seoCopy[locale];
   return {
     metadataBase: new URL('https://slidelatch.app'),
-    title: `SlideLatch — ${content.title.join(locale === 'zh' ? '' : ' ')}`,
+    title: content.title,
     description: content.description,
     alternates: { canonical: `/${locale}`, languages: { 'zh-CN': '/zh', en: '/en', 'x-default': '/zh' } },
-    openGraph: { title: 'SlideLatch', description: content.description, type: 'website', locale: locale === 'zh' ? 'zh_CN' : 'en_US' },
+    openGraph: { title: content.title, description: content.description, url: `/${locale}`, siteName: 'SlideLatch', type: 'website', locale: locale === 'zh' ? 'zh_CN' : 'en_US', alternateLocale: locale === 'zh' ? 'en_US' : 'zh_CN' },
+    twitter: { card: 'summary', title: content.title, description: content.description },
   };
 }
 export default async function Page({ params }: { params: Promise<{ locale: string }> }) {

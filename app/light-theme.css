@@ -131,3 +131,35 @@ html[data-theme='light'] {
  .hero::before { background:none; }
  .hero-copy { color:var(--ink); }
 }
+
+
+/* Searchable product context follows the existing demo, with native FAQ disclosure. */
+.hero-description { max-width:720px; margin:24px auto 0; color:#596175; font-size:17px; line-height:1.75; text-wrap:pretty; }
+.hero-status { max-width:680px; margin:14px auto 0; color:#70677f; font-size:13px; line-height:1.7; }
+.template-reuse,.template-faq { scroll-margin-top:110px; padding-block:64px; border-top:1px solid #dfe3ea; }
+.template-reuse h2,.template-faq h2 { margin:0; font-size:clamp(24px,3vw,32px); line-height:1.35; font-weight:600; letter-spacing:-.6px; text-wrap:balance; }
+.reuse-intro { display:grid; grid-template-columns:1fr 1.2fr; gap:64px; align-items:start; }
+.template-reuse p,.template-faq p { color:#596175; font-size:15px; line-height:1.85; }
+.reuse-intro p { margin:0; }
+.reuse-workflow-title { margin-top:54px!important; font-size:22px!important; }
+.reuse-steps { list-style:none; padding:0; margin:26px 0 0; }
+.reuse-steps li { display:grid; grid-template-columns:48px 1fr; gap:20px; padding:24px 0; border-bottom:1px solid #dfe3ea; }
+.reuse-steps li > span { color:#78619f; font-size:14px; padding-top:3px; }
+.reuse-steps h3 { margin:0; font-size:18px; font-weight:600; }
+.reuse-steps p { margin:9px 0 0; max-width:850px; }
+.reuse-case-note { max-width:880px; margin:28px 0 18px; }
+.reuse-links { display:flex; flex-wrap:wrap; gap:14px 32px; font-size:14px; color:#644b9e; }
+.template-faq h2 { margin-bottom:28px; }
+.template-faq details { padding:22px 0; border-bottom:1px solid #dfe3ea; }
+.template-faq summary { cursor:pointer; font-size:17px; font-weight:600; line-height:1.6; }
+.template-faq summary:focus-visible { outline:2px solid #8267d2; outline-offset:6px; }
+.template-faq details p { max-width:880px; margin:16px 0 0; }
+@media (max-width:640px) {
+ .hero-description { font-size:15px; margin-top:20px; }
+ .hero-status { font-size:12px; }
+ .template-reuse,.template-faq { padding-block:42px; }
+ .reuse-intro { grid-template-columns:1fr; gap:20px; }
+ .reuse-workflow-title { margin-top:36px!important; }
+ .reuse-steps li { grid-template-columns:28px 1fr; gap:12px; }
+ .template-faq summary { font-size:16px; }
+}

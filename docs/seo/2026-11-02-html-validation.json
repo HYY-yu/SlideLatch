@@ -1,0 +1,20 @@
+[
+  {
+    "locale": "en",
+    "title": "PowerPoint Template Automation, Your Design | SlideLatch",
+    "description": "Explore AI-assisted PowerPoint template automation for recurring reports. Try the browser demo, compare editable PPTX examples, and apply for early trials.",
+    "h1": "Your PowerPoint template.Reused with AI.",
+    "faqs": 6,
+    "anchors_valid": true,
+    "canonical_and_hreflang_valid": true
+  },
+  {
+    "locale": "zh",
+    "title": "PPT 模板自动化：让 AI 沿用你的设计 | SlideLatch",
+    "description": "面向重复交付报告的团队，探索 AI 复用已有 PPT 模板的流程。体验浏览器标记 Demo、对比可编辑 PPTX 案例，申请首批试用。",
+    "h1": "复用已有 PPT 模板，让 AI 沿用你的设计。",
+    "faqs": 6,
+    "anchors_valid": true,
+    "canonical_and_hreflang_valid": true
+  }
+]
