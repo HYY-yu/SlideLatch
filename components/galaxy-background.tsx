@@ -17,9 +17,9 @@ export default function GalaxyBackground() {
   }, []);
   return <div ref={host} className="galaxy-background" aria-hidden="true">
     <Galaxy key={generation} lightMode transparent={false} backgroundColor="#ffffff"
-      starColors={['#7651c9', '#9568db', '#b298dc']} density={0.8} layers={3}
-      starSize={1.1} glowIntensity={0.35} flareIntensity={0.7} opacity={0.7}
-      starSpeed={0.14} speed={0.35} rotationSpeed={0.015} twinkleIntensity={0.25}
-      mouseRepulsion repulsionStrength={1.5} clickWarp={false} intro={false} dpr={1} />
+      starColors={['#7651c9', '#9568db', '#b298dc']} density={0.56} layers={3}
+      starSize={0.9} glowIntensity={0.25} flareIntensity={0.2} opacity={0.42}
+      starSpeed={0.07} speed={0.18} rotationSpeed={0.004} twinkleIntensity={0.08}
+      mouseRepulsion repulsionStrength={1.1} clickWarp={false} intro={false} dpr={1} />
   </div>;
 }

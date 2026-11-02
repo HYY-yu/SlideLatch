@@ -10,9 +10,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   if (!isLocale(locale)) return {};
   const content = copy[locale];
   return {
+    metadataBase: new URL('https://slidelatch.app'),
     title: `SlideLatch — ${content.title.join(locale === 'zh' ? '' : ' ')}`,
     description: content.description,
-    alternates: { languages: { 'zh-CN': '/zh', en: '/en' } },
+    alternates: { canonical: `/${locale}`, languages: { 'zh-CN': '/zh', en: '/en', 'x-default': '/zh' } },
     openGraph: { title: 'SlideLatch', description: content.description, type: 'website', locale: locale === 'zh' ? 'zh_CN' : 'en_US' },
   };
 }

@@ -21,6 +21,7 @@
 | [品牌与域名](docs/naming-and-domains.md) | 品牌文案、名称取舍与核查记录 |
 | [支持与事件分析](docs/design/engagement-analytics.md) | 点赞、调查邀请、试用入口、PostHog 配置与 Tally Popup |
 | [真实生成对比](docs/design/generated-showcase.md) | 两份预生成案例、重建脚本与文件验收 |
+| [部署说明](docs/design/deployment.md) | Cloudflare Pages、生产域名与静态构建 |
 | [PPTX 工作台](docs/design/pptx-workbench.md) | 纯前端解析、SVG、标记与布局写回 |
 | [Web PPT 编辑引擎](docs/research/web-pptx-editors.md) | 候选库、原对象映射、许可与实验标准 |
 

@@ -477,7 +477,10 @@ h1.hero-enter { animation-delay: .08s; }
 
 /* Galaxy remains behind the content and never intercepts controls. */
 .site { position:relative; isolation:isolate; }
-.galaxy-background { position:absolute; inset:0 0 auto; height:620px; z-index:0; pointer-events:none; overflow:hidden; background:#fff; mask-image:linear-gradient(#000 0%,#000 68%,transparent 100%); }
+/* One viewport-sized canvas follows scrolling without allocating a page-height GPU surface. */
+.galaxy-background { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; background:#fff; }
 .galaxy-container,.galaxy-canvas { width:100%; height:100%; display:block; }
+/* Leave the headline and CTA calm; reveal the interactive stars toward the edges. */
+.galaxy-container { mask-image:radial-gradient(ellipse 55% 75% at 50% 43%,transparent 40%,#000 100%); }
 .site > main,.site > footer { position:relative; z-index:1; }
-@media (max-width:760px) { .galaxy-background { height:460px; } }
+@media (max-width:760px) { .galaxy-container { mask-image:radial-gradient(ellipse 85% 70% at 50% 48%,transparent 45%,#000 100%); } }
