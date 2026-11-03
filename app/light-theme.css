@@ -134,32 +134,75 @@ html[data-theme='light'] {
 
 
 /* Searchable product context follows the existing demo, with native FAQ disclosure. */
-.hero-description { max-width:720px; margin:24px auto 0; color:#596175; font-size:17px; line-height:1.75; text-wrap:pretty; }
-.hero-status { max-width:680px; margin:14px auto 0; color:#70677f; font-size:13px; line-height:1.7; }
 .template-reuse,.template-faq { scroll-margin-top:110px; padding-block:64px; border-top:1px solid #dfe3ea; }
 .template-reuse h2,.template-faq h2 { margin:0; font-size:clamp(24px,3vw,32px); line-height:1.35; font-weight:600; letter-spacing:-.6px; text-wrap:balance; }
-.reuse-intro { display:grid; grid-template-columns:1fr 1.2fr; gap:64px; align-items:start; }
 .template-reuse p,.template-faq p { color:#596175; font-size:15px; line-height:1.85; }
-.reuse-intro p { margin:0; }
-.reuse-workflow-title { margin-top:54px!important; font-size:22px!important; }
-.reuse-steps { list-style:none; padding:0; margin:26px 0 0; }
-.reuse-steps li { display:grid; grid-template-columns:48px 1fr; gap:20px; padding:24px 0; border-bottom:1px solid #dfe3ea; }
-.reuse-steps li > span { color:#78619f; font-size:14px; padding-top:3px; }
-.reuse-steps h3 { margin:0; font-size:18px; font-weight:600; }
-.reuse-steps p { margin:9px 0 0; max-width:850px; }
-.reuse-case-note { max-width:880px; margin:28px 0 18px; }
-.reuse-links { display:flex; flex-wrap:wrap; gap:14px 32px; font-size:14px; color:#644b9e; }
-.template-faq h2 { margin-bottom:28px; }
-.template-faq details { padding:22px 0; border-bottom:1px solid #dfe3ea; }
+.template-faq h2 { margin-bottom:16px; text-align:center; }
+.template-faq details { max-width:720px; margin-inline:auto; padding:16px 0; }
+.template-faq details:not(:last-child) { border-bottom:1px solid #dfe3ea; }
+.template-faq details:last-child { padding-bottom:0; }
 .template-faq summary { cursor:pointer; font-size:17px; font-weight:600; line-height:1.6; }
 .template-faq summary:focus-visible { outline:2px solid #8267d2; outline-offset:6px; }
 .template-faq details p { max-width:880px; margin:16px 0 0; }
 @media (max-width:640px) {
- .hero-description { font-size:15px; margin-top:20px; }
- .hero-status { font-size:12px; }
  .template-reuse,.template-faq { padding-block:42px; }
- .reuse-intro { grid-template-columns:1fr; gap:20px; }
- .reuse-workflow-title { margin-top:36px!important; }
- .reuse-steps li { grid-template-columns:28px 1fr; gap:12px; }
  .template-faq summary { font-size:16px; }
+}
+
+.template-reuse { padding-block-end:clamp(36px,5vw,56px); }
+.template-faq { padding-block:clamp(32px,4vw,48px) 0; }
+.template-faq + .early-access { border-top:0; padding-block-start:clamp(40px,5vw,56px); }
+.template-faq + .early-access::before { content:none; }
+.template-reuse h2 { text-align:center; }
+.reuse-steps {
+  --node-size: 40px;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  list-style:none;
+  padding:28px;
+  max-width:960px;
+  margin:24px auto 0;
+  text-align:center;
+  border:1px solid #e2dcec;
+  border-radius:16px;
+  background:linear-gradient(180deg,#f8f6fc,#fff);
+}
+.reuse-steps li { position:relative; padding-inline:12px; }
+.reuse-steps li:not(:last-child)::after {
+  content:"";
+  position:absolute;
+  top:calc(var(--node-size) / 2);
+  left:calc(50% + var(--node-size) / 2);
+  width:calc(100% - var(--node-size));
+  height:1px;
+  background:#c4b4e4;
+}
+.reuse-steps li > span {
+  display:grid;
+  place-items:center;
+  margin-inline:auto;
+  width:var(--node-size);
+  height:var(--node-size);
+  border:1px solid #bba8df;
+  border-radius:50%;
+  background:#f6f0ff;
+  box-shadow:0 0 14px #b393ff40;
+  color:#604595;
+  font:600 14px ui-monospace,monospace;
+}
+.reuse-steps h3 { margin:16px 0 0; font-size:17px; font-weight:600; }
+.template-reuse .reuse-steps p { margin:6px 0 0; color:#596175; line-height:1.6; }
+@media (max-width:640px) {
+  .reuse-steps { grid-template-columns:1fr; padding:22px; text-align:left; }
+  .reuse-steps li { display:grid; grid-template-columns:var(--node-size) 1fr; gap:14px; padding:0 0 22px; }
+  .reuse-steps li:last-child { padding-bottom:0; }
+  .reuse-steps li:not(:last-child)::after {
+    top:var(--node-size);
+    bottom:0;
+    left:calc(var(--node-size) / 2);
+    width:1px;
+    height:auto;
+    background:#c4b4e4;
+  }
+  .reuse-steps h3 { margin:0; }
 }

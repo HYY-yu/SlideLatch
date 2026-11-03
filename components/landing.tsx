@@ -50,8 +50,6 @@ export default function Landing({ locale }: { locale: Locale }) {
         <div className="hero-copy">
           <p className="eyebrow hero-enter">{t.eyebrow}</p>
           <h1 id="hero-title" className="hero-enter">{t.title[0]}<br/><span>{t.title[1]}</span></h1>
-          <p className="hero-description">{seo.intro}</p>
-          <p className="hero-status">{seo.status}</p>
           <div className="hero-actions hero-enter">
             <a className="button button-primary" href="#results">{t.primary}<Arrow /></a>
           </div>
@@ -62,11 +60,8 @@ export default function Landing({ locale }: { locale: Locale }) {
       </section>
 
       <section className="template-reuse section-shell" id="template-reuse" aria-labelledby="reuse-title">
-        <div className="reuse-intro"><h2 id="reuse-title">{seo.audienceTitle}</h2><p>{seo.audience}</p></div>
-        <h2 className="reuse-workflow-title">{seo.workflowTitle}</h2>
-        <ol className="reuse-steps">{seo.steps.map((step, index) => <li key={step.title}><span aria-hidden="true">0{index + 1}</span><div><h3>{step.title}</h3><p>{step.body}</p></div></li>)}</ol>
-        <p className="reuse-case-note">{seo.caseNote}</p>
-        <div className="reuse-links"><a href="#results">{seo.resultsLink} ↗</a><a href="#workflow">{seo.demoLink} ↗</a></div>
+        <h2 id="reuse-title">{seo.workflowTitle}</h2>
+        <ol className="reuse-steps" role="list">{seo.steps.map((step, index) => <li key={step.title}><span aria-hidden="true">0{index + 1}</span><div><h3>{step.title}</h3><p>{step.body}</p></div></li>)}</ol>
       </section>
 
       <section className="template-faq section-shell" id="faq" aria-labelledby="faq-title">
@@ -79,6 +74,6 @@ export default function Landing({ locale }: { locale: Locale }) {
         <TrialButton locale={locale} source="footer"/>
       </section>
     </main>
-    <footer className="footer section-shell"><Link href={`/${locale}`} aria-label="SlideLatch"><Brand /></Link><a href="#faq">{locale === 'zh' ? '常见问题' : 'FAQ'}</a><a href="#top">{t.footerTop}<span aria-hidden="true">↑</span></a></footer>
+    <footer className="footer section-shell"><Link href={`/${locale}`} aria-label="SlideLatch"><Brand /></Link><a href="#top">{t.footerTop}<span aria-hidden="true">↑</span></a></footer>
   </div></EngagementProvider>;
 }
