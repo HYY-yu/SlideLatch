@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
-import type { Box, GroupMember, Patches, SourceNode, SourceSlide } from './types';
+import { PAGE_CONTRACT_SHAPE, parsePageContract, pageContractText, validatePageContract } from '../workflow/page-contract.ts';
+import type { Box, GroupMember, PageContract, Patches, SourceNode, SourceSlide } from './types';
 
 export const NS = {
   p: 'http://schemas.openxmlformats.org/presentationml/2006/main',
@@ -91,7 +92,11 @@ export async function readSourceSlides(bytes: ArrayBuffer | Uint8Array): Promise
       }
     }
     visit(tree,null);
-    return { path, nodes };
+    const notes=await notesForSlide(zip,path);
+    const dedicated=notes&&descendants(notes.doc,NS.p,'sp').filter(shape=>ownProperties(shape)?.getAttribute('name')===PAGE_CONTRACT_SHAPE);
+    if(dedicated&&dedicated.length>1)throw new Error('PAGE_CONTRACT_DUPLICATE');
+    const pageContract=notes?parsePageContract(dedicated?.length?shapeText(dedicated[0]):descendants(notes.doc,NS.a,'t').map(t=>t.textContent??'').join('\n')):undefined;
+    return { path, nodes, ...(pageContract?{pageContract}:{}) };
   }));
 }
 
@@ -148,7 +153,12 @@ export async function writePptx(bytes: ArrayBuffer | Uint8Array, patches: Patche
   const grouped = new Map<string, [string, Patches[string]][]>();
   for (const [key, patch] of Object.entries(patches)) {
     const index = key.lastIndexOf('#'); const path = key.slice(0,index), id = key.slice(index+1);
-    if (index<0 || !/^ppt\/slides\/slide\d+\.xml$/.test(path) || !/^\d+$/.test(id)) throw new Error(`PATCH_TARGET: ${key}`);
+    if (index<0 || !/^ppt\/slides\/slide\d+\.xml$/.test(path) || !/^(?:\d+|@page)$/.test(id)) throw new Error(`PATCH_TARGET: ${key}`);
+    if(id==='@page'){
+      if(Object.keys(patch).length!==1||!patch.pageContract)throw new Error('PATCH_PAGE_CONTRACT');
+      await writePageContract(zip,path,validatePageContract(patch.pageContract));continue;
+    }
+    if(patch.pageContract!==undefined)throw new Error('PATCH_PAGE_TARGET');
     grouped.set(path,[...(grouped.get(path)||[]),[id,patch]]);
   }
   for (const [path, updates] of grouped) {
@@ -217,4 +227,74 @@ export async function writePptx(bytes: ArrayBuffer | Uint8Array, patches: Patche
     zip.file(path,new XMLSerializer().serializeToString(doc),{createFolders:false});
   }
   return zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
+}
+
+const PACKAGE_REL_NS='http://schemas.openxmlformats.org/package/2006/relationships';
+const CONTENT_NS='http://schemas.openxmlformats.org/package/2006/content-types';
+const relPath=(path:string)=>path.replace(/\/([^/]+)$/,'/_rels/$1.rels');
+const serialize=(doc:Document)=>new XMLSerializer().serializeToString(doc);
+async function notesForSlide(zip:JSZip,path:string){
+  const file=zip.file(relPath(path));if(!file)return undefined;
+  const doc=parseXml(await file.async('string'),relPath(path));
+  const rels=descendants(doc,'*','Relationship').filter(r=>r.getAttribute('Type')===`${NS.r}/notesSlide`);
+  if(rels.length>1)throw new Error('PPTX_NOTES_DUPLICATE');
+  const rel=rels[0];if(!rel)return undefined;
+  if(rel.getAttribute('TargetMode')==='External')throw new Error('PPTX_NOTES_EXTERNAL');
+  const target=rel.getAttribute('Target')??'';
+  if(!target||/^[a-z]+:/i.test(target))throw new Error('PPTX_NOTES_TARGET');
+  const notesPath=resolvePart(path,target),notes=zip.file(notesPath);
+  if(!notes)throw new Error('PPTX_NOTES_MISSING');
+  return {path:notesPath,doc:parseXml(await notes.async('string'),notesPath)};
+}
+function addRelation(doc:Document,type:string,target:string){
+  const used=new Set(descendants(doc,'*','Relationship').map(r=>r.getAttribute('Id')));let i=1;while(used.has(`rId${i}`))i++;
+  const rel=doc.createElementNS(PACKAGE_REL_NS,'Relationship');rel.setAttribute('Id',`rId${i}`);rel.setAttribute('Type',`${NS.r}/${type}`);rel.setAttribute('Target',target);doc.documentElement.appendChild(rel);
+}
+async function writePageContract(zip:JSZip,slidePath:string,contract:PageContract){
+  if(!zip.file(slidePath))throw new Error(`PATCH_PART: ${slidePath}`);
+  let notes=await notesForSlide(zip,slidePath);
+  if(!notes){
+    let i=1;while(zip.file(`ppt/notesSlides/notesSlide${i}.xml`)||zip.file(`ppt/notesSlides/_rels/notesSlide${i}.xml.rels`))i++;
+    const path=`ppt/notesSlides/notesSlide${i}.xml`;
+    notes={path,doc:parseXml(`<p:notes xmlns:p="${NS.p}" xmlns:a="${NS.a}" xmlns:r="${NS.r}"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:notes>`,path)};
+    const relFile=zip.file(relPath(slidePath));
+    const rels=parseXml(relFile?await relFile.async('string'):`<Relationships xmlns="${PACKAGE_REL_NS}"/>`,relPath(slidePath));
+    addRelation(rels,'notesSlide',`../notesSlides/notesSlide${i}.xml`);
+    zip.file(relPath(slidePath),serialize(rels),{createFolders:false});
+    const back=parseXml(`<Relationships xmlns="${PACKAGE_REL_NS}"/>`,relPath(path));
+    addRelation(back,'slide',`../slides/${slidePath.split('/').pop()}`);
+    const presentationRels=zip.file('ppt/_rels/presentation.xml.rels');
+    if(presentationRels){
+      const existing=descendants(parseXml(await presentationRels.async('string'),'presentation.xml.rels'),'*','Relationship').find(r=>r.getAttribute('Type')===`${NS.r}/notesMaster`&&r.getAttribute('TargetMode')!=='External');
+      if(existing){
+        const target=existing.getAttribute('Target')??'';
+        if(target&&!/^[a-z]+:/i.test(target)){
+          const master=resolvePart('ppt/presentation.xml',target);
+          if(zip.file(master))addRelation(back,'notesMaster',`/${master}`);
+        }
+      }
+    }
+    zip.file(relPath(path),serialize(back),{createFolders:false});
+    const contentFile=zip.file('[Content_Types].xml');if(!contentFile)throw new Error('PPTX_CONTENT_TYPES_MISSING');
+    const content=parseXml(await contentFile.async('string'),'[Content_Types].xml');
+    const override=content.createElementNS(CONTENT_NS,'Override');override.setAttribute('PartName',`/${path}`);override.setAttribute('ContentType','application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml');content.documentElement.appendChild(override);
+    if(!descendants(content,'*','Default').some(el=>el.getAttribute('Extension')==='rels')){const relDefault=content.createElementNS(CONTENT_NS,'Default');relDefault.setAttribute('Extension','rels');relDefault.setAttribute('ContentType','application/vnd.openxmlformats-package.relationships+xml');content.documentElement.appendChild(relDefault);}
+    zip.file('[Content_Types].xml',serialize(content),{createFolders:false});
+  }
+  const tree=descendants(notes.doc,NS.p,'spTree')[0];if(!tree)throw new Error('PPTX_NOTES_TREE');
+  const matches=descendants(notes.doc,NS.p,'sp').filter(shape=>ownProperties(shape)?.getAttribute('name')===PAGE_CONTRACT_SHAPE);
+  if(matches.length>1)throw new Error('PAGE_CONTRACT_DUPLICATE');
+  let shape=matches[0];
+  if(!shape){
+    const used=new Set(descendants(notes.doc,NS.p,'cNvPr').map(el=>el.getAttribute('id')));let id=2;while(used.has(String(id)))id++;
+    shape=parseXml(`<p:sp xmlns:p="${NS.p}" xmlns:a="${NS.a}"><p:nvSpPr><p:cNvPr id="${id}" name="${PAGE_CONTRACT_SHAPE}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="6000000" cy="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>`,'page-contract').documentElement;
+    shape=notes.doc.importNode(shape,true) as Element;tree.appendChild(shape);
+  }
+  // Use separate paragraphs: compiler and Office both preserve line boundaries.
+  const body=child(shape,'txBody');if(!body)throw new Error('PPTX_PAGE_CONTRACT_BODY');
+  for(const p of children(body).filter(el=>el.localName==='p'))body.removeChild(p);
+  for(const line of pageContractText(contract).split('\n')){
+    const p=notes.doc.createElementNS(NS.a,'a:p'),r=notes.doc.createElementNS(NS.a,'a:r'),t=notes.doc.createElementNS(NS.a,'a:t');t.textContent=line;r.appendChild(t);p.appendChild(r);body.appendChild(p);
+  }
+  zip.file(notes.path,serialize(notes.doc),{createFolders:false});
 }

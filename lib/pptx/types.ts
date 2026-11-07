@@ -7,10 +7,11 @@ export type SourceNode = {
   geometry?: { preset: string; adjustments: Record<string, number> };
   hasImage?: boolean; hasTextBody?: boolean; dataKind?: 'table' | 'chart';
 };
-export type SourceSlide = { path: string; nodes: SourceNode[] };
+export type PageContract = { pageType: '封面页' | '目录页' | '章节过渡页' | '内容页' | '结尾页'; logic: string[] };
+export type SourceSlide = { path: string; nodes: SourceNode[]; pageContract?: PageContract };
 export type GroupMember = {key:string;box:Box;rotation:number;flipH:boolean;flipV:boolean};
 export type NativeGroup = {box:Box;members:GroupMember[];released:GroupMember[]};
-export type ElementPatch = { name?: string; box?: Box; text?: string; group?:NativeGroup };
+export type ElementPatch = { pageContract?: PageContract; name?: string; box?: Box; text?: string; group?:NativeGroup };
 export type Patches = Record<string, ElementPatch>;
 export type Paint = { type: string; value?: unknown; [key: string]: unknown };
 export type RenderElement = {

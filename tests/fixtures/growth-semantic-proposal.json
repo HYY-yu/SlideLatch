@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "templateSha256": "08a38d1289948575f50d039c7f9b6f08f5c327ac9bf42a0c75e87b6c373dc01b",
+  "snapshotId": "4955c4e049f577fbf5ed580a790e0055247c2c7771d881c7a4711e248588efa7",
+  "marks": [
+    {
+      "key": "ppt/slides/slide34.xml#3",
+      "name": "@文本[4-20]",
+      "reason": "报告主标题，概括业务主题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide34.xml#1003",
+      "name": "@文本[4-24]",
+      "reason": "封面副标题，表达报告视角。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide34.xml#5",
+      "name": "@文本[16-60]",
+      "reason": "封面说明段，概括本次报告范围。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide34.xml#6",
+      "name": "@文本[3-20]",
+      "reason": "报告团队署名，可按复用场景调整。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#15",
+      "name": "@文本[2-8]",
+      "reason": "目录标题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#2",
+      "name": "@文本[12-40]",
+      "reason": "目录引言，介绍章节安排。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#115",
+      "name": "@1@1",
+      "reason": "三个同构目录项的第一个固定列表项。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#119",
+      "name": "@1@2",
+      "reason": "第二个固定目录项，与第一项保持合同。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#123",
+      "name": "@1@3",
+      "reason": "第三个固定目录项，与第一项保持合同。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#116",
+      "name": "@序号-01",
+      "reason": "目录顺序号由程序按项目位置填充。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#117",
+      "name": "@文本[4-12]",
+      "reason": "目录章节标题，后续项目继承相同范围。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#120",
+      "name": "@序号-01",
+      "reason": "第二项目录序号。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#121",
+      "name": "@文本",
+      "reason": "第二个章节名继承首项合同。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#124",
+      "name": "@序号-01",
+      "reason": "第三项目录序号。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide35.xml#125",
+      "name": "@文本",
+      "reason": "第三个章节名继承首项合同。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide36.xml#5",
+      "name": "@序号-01",
+      "reason": "章节过渡页序号，应由程序按章节位置生成。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide36.xml#3",
+      "name": "@文本[4-20]",
+      "reason": "章节标题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide36.xml#4",
+      "name": "@文本[12-40]",
+      "reason": "章节导语，说明这一章的工作目的。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide37.xml#10",
+      "name": "@文本[6-24]",
+      "reason": "内容页核心结论标题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide37.xml#4",
+      "name": "@文本[4-12]",
+      "reason": "左栏行动标签。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide37.xml#5",
+      "name": "@文本[20-64]",
+      "reason": "左栏解释需求验证的正文。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide37.xml#6",
+      "name": "@文本[4-12]",
+      "reason": "右栏行动标签。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide37.xml#7",
+      "name": "@文本[20-64]",
+      "reason": "右栏解释规模化协作的正文。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide38.xml#2",
+      "name": "@文本[6-24]",
+      "reason": "行动计划页标题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide38.xml#5",
+      "name": "@文本[16-44]",
+      "reason": "行动计划摘要；下方多组件内容本轮保守保留原样。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide39.xml#5",
+      "name": "@序号-01",
+      "reason": "第二章序号，程序填充。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide39.xml#3",
+      "name": "@文本[4-20]",
+      "reason": "第二章标题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide39.xml#4",
+      "name": "@文本[12-40]",
+      "reason": "第二章导语。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide40.xml#9",
+      "name": "@文本[6-24]",
+      "reason": "市场拓展内容页标题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide40.xml#5",
+      "name": "@文本[6-20]",
+      "reason": "正文分节标题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide40.xml#6",
+      "name": "@文本[20-60]",
+      "reason": "市场进入和交付策略说明。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide40.xml#8",
+      "name": "@文本[16-48]",
+      "reason": "页面结论。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide41.xml#5",
+      "name": "@序号-01",
+      "reason": "第三章序号，程序填充。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide41.xml#3",
+      "name": "@文本[4-20]",
+      "reason": "第三章标题。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide41.xml#4",
+      "name": "@文本[12-40]",
+      "reason": "第三章导语。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide42.xml#8",
+      "name": "@文本[6-24]",
+      "reason": "图表页的结论标题；原生图表及数值说明本轮未标记，避免宣称完成数据同步。 字数范围仅为语义候选，未进行视觉边界审查。"
+    },
+    {
+      "key": "ppt/slides/slide43.xml#4",
+      "name": "@文本[6-24]",
+      "reason": "结束页总结口号。 字数范围仅为语义候选，未进行视觉边界审查。"
+    }
+  ],
+  "pages": [
+    {
+      "path": "ppt/slides/slide34.xml",
+      "pageType": "封面页",
+      "logic": [
+        "主题",
+        "副标题",
+        "报告范围"
+      ],
+      "reason": "标题层次、团队署名和位置构成整份报告封面。"
+    },
+    {
+      "path": "ppt/slides/slide35.xml",
+      "pageType": "目录页",
+      "logic": [
+        "增长成果复盘",
+        "市场拓展实践",
+        "经营指标分析"
+      ],
+      "reason": "内容导航和三项章节名定义目录。"
+    },
+    {
+      "path": "ppt/slides/slide36.xml",
+      "pageType": "章节过渡页",
+      "logic": [
+        "增长成果复盘"
+      ],
+      "reason": "大号01与章节标题引入第一章。"
+    },
+    {
+      "path": "ppt/slides/slide37.xml",
+      "pageType": "内容页",
+      "logic": [
+        "验证价值",
+        "扩大覆盖"
+      ],
+      "reason": "两栏对照说明从验证走向协同增长。"
+    },
+    {
+      "path": "ppt/slides/slide38.xml",
+      "pageType": "内容页",
+      "logic": [
+        "客户洞察",
+        "产品打磨",
+        "渠道协同"
+      ],
+      "reason": "三个动作组织下一阶段行动。"
+    },
+    {
+      "path": "ppt/slides/slide39.xml",
+      "pageType": "章节过渡页",
+      "logic": [
+        "市场拓展实践"
+      ],
+      "reason": "大号02引入第二章。"
+    },
+    {
+      "path": "ppt/slides/slide40.xml",
+      "pageType": "内容页",
+      "logic": [
+        "真实需求",
+        "可靠交付",
+        "复用方法"
+      ],
+      "reason": "正文阐述市场拓展路径。"
+    },
+    {
+      "path": "ppt/slides/slide41.xml",
+      "pageType": "章节过渡页",
+      "logic": [
+        "经营指标分析"
+      ],
+      "reason": "大号03引入第三章。"
+    },
+    {
+      "path": "ppt/slides/slide42.xml",
+      "pageType": "内容页",
+      "logic": [
+        "新增合作客户",
+        "季度变化"
+      ],
+      "reason": "图表展示虚构经营指标。"
+    },
+    {
+      "path": "ppt/slides/slide43.xml",
+      "pageType": "结尾页",
+      "logic": [
+        "总结",
+        "行动共识"
+      ],
+      "reason": "结尾口号和总结文字收束全篇。"
+    }
+  ]
+}
