@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "commander": "^14.0.0",
-    "fast-xml-parser": "^5.2.5",
+    "fast-xml-parser": "5.10.1",
     "jszip": "^3.10.1",
     "pptx-automizer": "^0.8.2"
   },

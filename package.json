@@ -25,7 +25,7 @@
     "verify": "npm run check && npm run build && SLIDELATCH_DIST_DIR=.next-cloudflare npm run build:cloudflare"
   },
   "dependencies": {
-    "fast-xml-parser": "5.9.3",
+    "fast-xml-parser": "5.10.1",
     "jszip": "^3.10.2",
     "next": "^15.1.11",
     "posthog-js": "^1.444.0",
