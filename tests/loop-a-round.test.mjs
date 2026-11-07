@@ -49,3 +49,25 @@ test('budgets cannot exceed ceilings and tiny deadline exits', async () => {
  for (const patch of [{attempts:3},{attempts:0},{timeoutMs:1200001}]) await assert.rejects(round({...f,...patch}),/invalid budget/);
  await assert.rejects(round({...f,timeoutMs:1}));
 });
+test('invalid JSON input never claims or strands the lock', async () => {
+ const f = await fixture();
+ for (const input of [null, [], false, 1, 'input']) await assert.rejects(round({...f,input}),/invalid input object/);
+ assert.equal((await round({...f,input})).status,'inspected');
+});
+test('damaged history fails closed without overwriting evidence or stranding lock', async () => {
+ const { writeFile, readFile, access } = await import('node:fs/promises');
+ const f = await fixture();
+ await round({...f,input});
+ const path = join(f.main,'.git','loop-a','issue-9.json');
+ const good = JSON.parse(await readFile(path,'utf8'));
+ const invalid = [null, [], {}, {...good,extra:true}, ...['blocked','stagnant','head','reason','paused'].map(key => {const h={...good};delete h[key];return h;}), ...[-100,3,0.5,'1',null].flatMap(value=>[{...good,stagnant:value},{...good,blocked:value}]), {...good,head:'bad'}, {...good,head:null}, {...good,reason:'unknown'}, {...good,reason:'timeout'}, {...good,paused:'false'}, {...good,paused:true}, {...good,stagnant:2,paused:false}];
+ for (const history of invalid) {
+  const bytes=JSON.stringify(history);
+  await writeFile(path,bytes);
+  await assert.rejects(round({...f,input}),/invalid history schema/);
+  assert.equal(await readFile(path,'utf8'),bytes);
+  await assert.rejects(access(join(f.main,'.git','loop-a','lock')), {code:'ENOENT'});
+ }
+ await writeFile(path,JSON.stringify(good));
+ assert.equal((await round({...f,input})).paused,true);
+});
