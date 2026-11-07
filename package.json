@@ -21,7 +21,8 @@
     "workflow:check": "tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --allowImportingTsExtensions --esModuleInterop --skipLibCheck scripts/slidelatch-release.ts",
     "ai:prepare": "node --experimental-strip-types scripts/slidelatch-ai.mjs prepare",
     "ai:apply": "node --experimental-strip-types scripts/slidelatch-ai.mjs apply",
-    "ai:codex": "node --experimental-strip-types scripts/slidelatch-ai.mjs codex"
+    "ai:codex": "node --experimental-strip-types scripts/slidelatch-ai.mjs codex",
+    "verify": "npm run check && npm run build && SLIDELATCH_DIST_DIR=.next-cloudflare npm run build:cloudflare"
   },
   "dependencies": {
     "jszip": "^3.10.2",
