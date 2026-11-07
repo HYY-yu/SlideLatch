@@ -22,7 +22,9 @@
 
 ## 任务状态与交接
 
-1. **待派发**。Issue 写清 owner、领域、依赖、允许路径、输入输出、不变量、失败行为、验收命令与风险。无 GitHub 访问时先用本地任务记录，标注尚无远程 Issue，不伪造编号。
+每次修复先创建或复用对应 GitHub Issue，再开始修改。已有修复示例见 [#5](https://github.com/HYY-yu/SlideLatch/issues/5)。
+
+1. **待派发**。Issue 写清 owner、领域、依赖、允许路径、输入输出、不变量、失败行为、验收命令与风险。无 GitHub 访问时只做只读诊断与本地记录，创建或复用 Issue 后再开始修改，不伪造编号。
 2. **实现中**。owner 在独立 worktree 和分支先补能失败的回归验收，再实现最小改动。主目录、他人分支和用户未提交改动只读。只推自己的任务分支，不 force-push 共享分支。
 3. **待独立验收**。owner 提交代码，给出完整 head SHA、diff、命令、结果和限制。先开 draft PR。verifier 不参与该变更的编写，使用独立干净 worktree 检出精确 SHA。
 4. **验收通过或退回**。verifier 记录 SHA、身份、时间、输入样本的非敏感标识、环境、实际命令、结构/浏览器/原生各层结果、证据位置及未覆盖项。失败退给 owner；禁止由作者自行降低验收要求。
@@ -55,7 +57,12 @@
 
 ## GitHub CI 与边界
 
-工作流仅由 pull_request、main push 和 workflow_dispatch 触发。Node 24，分别按根目录与 packages/ppt-dsl 锁文件安装，再运行统一验证。workflow 只读仓库，不使用客户文件、模型账户、部署密钥，不调用 AI，不自动创建 Issue、合并或发布网站。
+工作流仅由 pull_request、main push 和 workflow_dispatch 触发，使用 Node 24。
+
+- `cloudflare-root-install` 在独立 runner 仅运行根 `npm clean-install --progress=false`，确认没有 `packages/ppt-dsl/node_modules` 后运行 `npm run build:cloudflare`，复现 Cloudflare 的安装路径。根应用直接编译共享 DSL 源码，因此根 `dependencies` 必须声明这些源码需要的运行时包。
+- `verify` 仍分别按根目录与 packages/ppt-dsl 锁文件安装，再运行完整统一验证。
+
+workflow 只读仓库，不使用客户文件、模型账户、部署密钥，不调用 AI，不自动创建 Issue、合并或发布网站。
 
 首次远程 CI 成功必须以 GitHub 实际 run 与目标 SHA 为证。只有本地通过时应写“本地通过，远端未运行”。网络、权限或依赖安装失败应保留原错误与完成范围，不修改安全设置求绿。
 
