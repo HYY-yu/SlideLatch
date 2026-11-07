@@ -1,0 +1,9 @@
+# One explicit host invocation
+
+Invoke `$slidelatch-loop-once` with JSON containing version: 1, repository: HYY-yu/SlideLatch, issue (authorized positive integer), authorization (exact user source), owner (real coordinator ID), entryRoot and entrySha (clean frozen implementation checkout/full SHA), worktree/branch/baseSha (different clean independent task worktree, non-main branch and full base SHA), paths (exact relative files), startedAt (invocation Unix milliseconds), maxRepairs: 2, publish: true (explicit task push and Draft PR authorization).
+
+Run `node ENTRY/scripts/loop-a-once.mjs prepare input.json` and retain output as plan.json outside repositories. The actual native host executes the skill; the helper is not an autonomous shell runner, daemon or fabricated native API. Twenty minutes starts at startedAt and never renews. Missing publish permission is a preflight blocker.
+
+After genuine lifecycle release run `node ENTRY/scripts/loop-a-once.mjs complete plan.json archive.json remote.json`. Use the actual release archive, not reconstructed success state. remote.json contains repository, issue, head, draft, url, run, mergeSha, passed, source and observedAt from fresh real GitHub observations. The helper checks consistency only and cannot authenticate native or remote reports. All required checks must be queried by the host; aggregate passed cannot replace that query.
+
+Acceptance requires independent review of a frozen implementation followed by one real invocation. Pilot writer may change only `.codex/agents/integration-manager.toml` to route explicit calls to the skill. Pilot cannot edit skill/helper/lifecycle/tests/package scripts. Verify new commit, native writer, independent native reviewer, managed verify, Draft PR/CI and release with no parent next-step prompts. Routing is intentionally left to that pilot. Implementation and unit tests do not prove pilot success.

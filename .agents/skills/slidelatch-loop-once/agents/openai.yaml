@@ -1,0 +1,5 @@
+interface:
+  display_name: "SlideLatch single round"
+  short_description: "Run one explicitly authorized host-native Loop A round"
+policy:
+  allow_implicit_invocation: false
