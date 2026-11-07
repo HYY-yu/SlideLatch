@@ -35,47 +35,65 @@ async function fixture(fn) {
   const g = (...a) => execFileSync('git', a, { cwd: root, stdio: 'pipe' });
   try {
     g('init'); g('config', 'user.email', 'fixture@example.invalid'); g('config', 'user.name', 'Fixture');
-    await writeFile(join(root, 'file'), 'base'); g('add', '.'); g('commit', '-m', 'base');
+    await writeFile(join(root, 'file'), 'base'); await writeFile(join(root, 'package.json'), JSON.stringify({ scripts: { verify: 'node -e \"process.exit(0)\"' } })); g('add', '.'); g('commit', '-m', 'base');
     g('worktree', 'add', '-b', 'writer', join(root, 'writer'));
     await fn(join(root, 'writer'), root);
   } finally { await rm(root, { recursive: true, force: true }); }
 }
 const setup = async cwd => acquire(cwd, { issue: 11, authorization: 'fixture', owner: 'coordinator', paths: ['file'] });
-const call = async (cwd, cap, action, data = {}, id = crypto.randomUUID()) => transition(cwd, { ...cap, expected_revision: (await inspect(cwd)).revision, operation_id: id, action, data });
+const call = async (cwd, cap, action, data = {}, id = crypto.randomUUID()) => transition(cap.cwd ?? cwd, { ...cap, expected_revision: (await inspect(cwd)).revision, operation_id: id, action, data });
+async function verifyReviewer(cwd, cap) {
+  const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+  await managedCommand(cap.cwd, { ...cap, expected_revision: (await inspect(cwd)).revision, operation_id: crypto.randomUUID(), data: { label: 'verify' } });
+}
 async function bind(cwd, cap, role, id) {
   await call(cwd, cap, 'dispatch-intent', { role });
   const a = (await inspect(cwd)).actors.at(-1);
   const token = crypto.randomUUID();
-  await call(cwd, cap, 'bind-actor', { intent: a.intent, id, capability: token });
-  return { epoch: cap.epoch, token };
+  let worktree = cwd;
+  if (role === 'reviewer') { worktree = join(cwd, '..', `review-${crypto.randomUUID()}`); execFileSync('git', ['worktree','add','--detach',worktree,'HEAD'], { cwd, stdio: 'pipe' }); }
+  await call(cwd, cap, 'bind-actor', { intent: a.intent, id, capability: token, worktree });
+  return { epoch: cap.epoch, token, cwd: worktree };
 }
 test('complete writer, independent reviewer, draft and CI lifecycle releases shared lock', () => fixture(async cwd => {
   const cap = await setup(cwd);
   const writer = await bind(cwd, cap, 'writer', 'native-writer');
   await assert.rejects(call(cwd, cap, 'dispatch-intent', { role: 'writer' }), /active actor/);
-  await call(cwd, writer, 'write', { path: 'file', content: 'base' });
-  await call(cwd, cap, 'confirm-quiescent', { stopped_ids: ['native-writer'], evidence: 'writer acknowledged no further writes or external commands' });
+  const originalHead = (await inspect(cwd)).head;
+  await call(cwd, writer, 'write', { path: 'file', content: 'actual writer change' });
+  const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+  for (const label of ['commit','verify']) await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: `writer-${label}`, data: { label } });
+  const committedHead = execFileSync('git', ['rev-parse','HEAD'], { cwd, encoding: 'utf8' }).trim();
+  assert.notEqual(committedHead, originalHead);
+  assert.equal((await inspect(cwd)).commands.at(-1).identity.head, committedHead);
+  await call(cwd, cap, 'confirm-quiescent', { observations: ['native-writer'].map(id => ({ id, status: 'stop-acknowledged', noExternalProcesses: true, source: 'fixture actor acknowledgement', observedAt: Date.now() })) });
   await call(cwd, cap, 'seal-writer');
+  assert.equal((await inspect(cwd)).head, committedHead);
   await call(cwd, cap, 'dispatch-intent', { role: 'reviewer' });
   const intent = (await inspect(cwd)).actors.at(-1).intent;
   await assert.rejects(call(cwd, cap, 'bind-actor', { intent, id: 'native-writer', capability: crypto.randomUUID() }), /identity conflict/);
   const token = crypto.randomUUID();
-  await call(cwd, cap, 'bind-actor', { intent, id: 'native-reviewer', capability: token });
+  const reviewCwd = join(cwd, '..', 'reviewer');
+  execFileSync('git', ['worktree','add','--detach',reviewCwd,'HEAD'], { cwd, stdio: 'pipe' });
+  await call(cwd, cap, 'bind-actor', { intent, id: 'native-reviewer', capability: token, worktree: reviewCwd });
   const head = (await inspect(cwd)).head;
-  await call(cwd, { epoch: cap.epoch, token }, 'record-review', { head, passed: true, evidence: 'independent fixture review' });
+  await verifyReviewer(cwd, { epoch: cap.epoch, token, cwd: reviewCwd });
+  await call(cwd, { epoch: cap.epoch, token, cwd: reviewCwd }, 'record-review', { head, passed: true, evidence: 'independent fixture review' });
   await call(cwd, cap, 'record-pr', { head, draft: true, url: 'https://github.com/example/repo/pull/1' });
   await call(cwd, cap, 'record-ci', { head, mergeSha: head, run: 'fixture-run', passed: true });
-  await call(cwd, cap, 'confirm-quiescent', { stopped_ids: ['native-writer','native-reviewer'], evidence: 'both acknowledged stopped' });
+  await call(cwd, cap, 'confirm-quiescent', { observations: ['native-writer','native-reviewer'].map(id => ({ id, status: 'stop-acknowledged', noExternalProcesses: true, source: 'fixture actor acknowledgement', observedAt: Date.now() })) });
   const request = { ...cap, expected_revision: (await inspect(cwd)).revision, operation_id: 'release', action: 'release', data: {} };
   const released = await transition(cwd, request);
   assert.equal(released.phase, 'RELEASED');
   assert.deepEqual(await transition(cwd, request), released);
-  await setup(cwd);
+  const nextLease = await setup(cwd);
+  assert.deepEqual(await transition(cwd, request), released);
+  assert.equal((await inspect(cwd)).epoch, nextLease.epoch);
 }));
 test('unbound spawn and pending command cannot be declared quiescent', () => fixture(async cwd => {
   const cap = await setup(cwd);
   await call(cwd, cap, 'dispatch-intent', { role: 'writer' });
-  await assert.rejects(call(cwd, cap, 'confirm-quiescent', { stopped_ids: [], evidence: 'unknown spawn' }), /positive actor/);
+  await assert.rejects(call(cwd, cap, 'confirm-quiescent', { observations: [].map(id => ({ id, status: 'stop-acknowledged', noExternalProcesses: true, source: 'fixture actor acknowledgement', observedAt: Date.now() })) }), /positive actor/);
   await assert.rejects(setup(cwd), /EEXIST/);
 }));
 test('managed command records actual process exit and cannot run unknown labels', () => fixture(async cwd => {
@@ -104,10 +122,11 @@ test('deadline stops new work without releasing lease', () => fixture(async (cwd
 }));
 test('changed HEAD invalidates acceptance before PR recording', () => fixture(async cwd => {
   const cap = await setup(cwd);
-  await call(cwd, cap, 'confirm-quiescent', { stopped_ids: [], evidence: 'no actors' });
+  await call(cwd, cap, 'confirm-quiescent', { observations: [].map(id => ({ id, status: 'stop-acknowledged', noExternalProcesses: true, source: 'fixture actor acknowledgement', observedAt: Date.now() })) });
   await call(cwd, cap, 'seal-writer');
   const reviewer = await bind(cwd, cap, 'reviewer', 'reviewer');
   const head = (await inspect(cwd)).head;
+  await verifyReviewer(cwd, reviewer);
   await call(cwd, reviewer, 'record-review', { head, passed: true, evidence: 'review fixture' });
   execFileSync('git', ['commit','--allow-empty','-m','changed'], { cwd, stdio: 'pipe' });
   await assert.rejects(call(cwd, cap, 'record-pr', { head, draft: true, url: 'https://github.com/example/repo/pull/1' }), /head changed/);
@@ -125,7 +144,7 @@ test('symlink path and unknown state schema are rejected', () => fixture(async (
 test('second identical repair evidence pauses while retaining lock', () => fixture(async cwd => {
   const cap = await setup(cwd);
   for (let i = 0; i < 2; i++) {
-    await call(cwd, cap, 'confirm-quiescent', { stopped_ids: [], evidence: 'no actors' });
+    await call(cwd, cap, 'confirm-quiescent', { observations: [].map(id => ({ id, status: 'stop-acknowledged', noExternalProcesses: true, source: 'fixture actor acknowledgement', observedAt: Date.now() })) });
     await call(cwd, cap, 'seal-writer');
     await call(cwd, cap, 'repair', { evidence: 'same blocker' });
   }
@@ -146,5 +165,95 @@ test('deadline supervisor stops only its live process group and retains lease', 
   const s = await inspect(cwd);
   assert(s.commands[0].exit.signal || s.commands[0].exit.code !== 0);
   assert.equal(s.commands[0].status, 'EXITED');
+  await assert.rejects(setup(cwd), /EEXIST/);
+}));
+test('worker cannot forge supervisor exit, and inspect exposes no supervisor nonce', () => fixture(async cwd => {
+  const cap = await setup(cwd); const writer = await bind(cwd, cap, 'writer', 'writer');
+  await assert.rejects(call(cwd, writer, 'command-intent', { label: 'verify', nonce: 'forged' }), /supervisor-only/);
+  await assert.rejects(call(cwd, writer, 'command-exit', { id: 'fake', nonce: 'fake', evidence: { pid: 1, started: 1, groupGone: true, code: 0 } }), /supervisor-only/);
+  assert(!JSON.stringify(await inspect(cwd)).includes('capability'));
+}));
+test('hardlinks cannot mutate files outside the approved worktree', () => fixture(async (cwd, root) => {
+  const { link, readFile } = await import('node:fs/promises');
+  const cap = await setup(cwd); const writer = await bind(cwd, cap, 'writer', 'writer');
+  await rm(join(cwd, 'file')); await link(join(root, 'file'), join(cwd, 'file'));
+  await assert.rejects(call(cwd, writer, 'write', { path: 'file', content: 'escaped' }), /hardlink/);
+  assert.equal(await readFile(join(root, 'file'), 'utf8'), 'base');
+}));
+test('native completed alone is not positive stop evidence', () => fixture(async cwd => {
+  const cap = await setup(cwd); await bind(cwd, cap, 'writer', 'writer');
+  await assert.rejects(call(cwd, cap, 'confirm-quiescent', { stopped_ids: ['writer'], evidence: 'native completed' }), /positive actor/);
+  await assert.rejects(call(cwd, cap, 'confirm-quiescent', { observations: [{ id: 'writer', status: 'completed', noExternalProcesses: true, source: 'native status', observedAt: Date.now() }] }), /positive actor/);
+}));
+test('independent reviewer runs managed verify but cannot write source or commit', () => fixture(async cwd => {
+  const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+  await writeFile(join(cwd, 'package.json'), JSON.stringify({ scripts: { verify: 'node -e "process.exit(0)"' } }));
+  execFileSync('git', ['add','package.json'], { cwd }); execFileSync('git', ['commit','--allow-empty','-m','fixture command'], { cwd, stdio: 'pipe' });
+  const cap = await setup(cwd);
+  await call(cwd, cap, 'confirm-quiescent', { observations: [] }); await call(cwd, cap, 'seal-writer');
+  const reviewer = await bind(cwd, cap, 'reviewer', 'reviewer');
+  await managedCommand(reviewer.cwd, { ...reviewer, expected_revision: (await inspect(cwd)).revision, operation_id: 'review-verify', data: { label: 'verify' } });
+  assert.equal((await inspect(cwd)).commands[0].exit.code, 0);
+  assert(!JSON.stringify((await inspect(cwd)).commands).includes('nonce'));
+  await assert.rejects(call(cwd, reviewer, 'write', { path: 'file', content: 'bad' }), /forbidden/);
+  await assert.rejects(managedCommand(reviewer.cwd, { ...reviewer, expected_revision: (await inspect(cwd)).revision, operation_id: 'review-commit', data: { label: 'commit' } }), /forbidden/);
+}));
+test('persisted pending mutation refuses replay and retains lease', () => fixture(async (cwd, root) => {
+  const { readFile } = await import('node:fs/promises');
+  const cap = await setup(cwd); const writer = await bind(cwd, cap, 'writer', 'writer');
+  const path = join(root, '.git/loop-a/lock/state.json'); const state = JSON.parse(await readFile(path, 'utf8'));
+  state.mutation = { operation: 'crashed-write', path: 'file', status: 'PENDING', contentHash: 'a'.repeat(64) };
+  await writeFile(path, JSON.stringify(state));
+  await assert.rejects(call(cwd, writer, 'write', { path: 'file', content: 'base' }, 'crashed-write'), /pending mutation/);
+  await assert.rejects(setup(cwd), /EEXIST/);
+}));
+test('review gate rejects missing verify and dirty review checkout', () => fixture(async cwd => {
+  const cap = await setup(cwd);
+  await call(cwd, cap, 'confirm-quiescent', { observations: [] }); await call(cwd, cap, 'seal-writer');
+  const reviewer = await bind(cwd, cap, 'reviewer', 'reviewer'); const head = (await inspect(cwd)).head;
+  await assert.rejects(call(cwd, reviewer, 'record-review', { head, passed: true, evidence: 'claimed' }), /reviewer verify/);
+  await verifyReviewer(cwd, reviewer);
+  await writeFile(join(reviewer.cwd, 'file'), 'uncommitted');
+  await assert.rejects(call(cwd, reviewer, 'record-review', { head, passed: true, evidence: 'claimed' }), /reviewer verify/);
+}));
+test('review gate rejects actual failing verify', () => fixture(async cwd => {
+  await writeFile(join(cwd, 'package.json'), JSON.stringify({ scripts: { verify: 'node -e "process.exit(2)"' } }));
+  execFileSync('git', ['add','package.json'], { cwd }); execFileSync('git', ['commit','-m','failing fixture'], { cwd, stdio: 'pipe' });
+  const cap = await setup(cwd); await call(cwd, cap, 'confirm-quiescent', { observations: [] }); await call(cwd, cap, 'seal-writer');
+  const reviewer = await bind(cwd, cap, 'reviewer', 'reviewer'); const head = (await inspect(cwd)).head;
+  await verifyReviewer(cwd, reviewer);
+  assert.equal((await inspect(cwd)).commands.at(-1).exit.code, 2);
+  await assert.rejects(call(cwd, reviewer, 'record-review', { head, passed: true, evidence: 'claimed' }), /reviewer verify/);
+}));
+test('managed commands discard caller NODE_OPTIONS and PATH injection', () => fixture(async cwd => {
+  const cap = await setup(cwd); const writer = await bind(cwd, cap, 'writer', 'writer');
+  const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+  const options = process.env.NODE_OPTIONS, path = process.env.PATH;
+  try {
+    process.env.NODE_OPTIONS = '--require=/definitely/not/a/module'; process.env.PATH = '/definitely/not/a/path';
+    await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: 'clean-env', data: { label: 'verify' } });
+    assert.equal((await inspect(cwd)).commands.at(-1).exit.code, 0);
+  } finally {
+    if (options === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = options;
+    process.env.PATH = path;
+  }
+}));
+test('command replay returns prior observed outcome without respawning', () => fixture(async cwd => {
+  const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+  const cap = await setup(cwd); const writer = await bind(cwd, cap, 'writer', 'writer');
+  const request = { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: 'replayed-command', data: { label: 'verify' } };
+  const result = await managedCommand(cwd, request);
+  assert.deepEqual(await managedCommand(cwd, request), result);
+  assert.equal((await inspect(cwd)).commands.length, 1);
+}));
+test('leader exit with living descendant is uncertain and cannot release', () => fixture(async cwd => {
+  const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+  await writeFile(join(cwd, 'verify.cjs'), `const {spawn}=require('node:child_process'); const child=spawn(process.execPath,['-e','setTimeout(()=>{},2500)'],{stdio:'ignore'}); child.unref();`);
+  await writeFile(join(cwd, 'package.json'), JSON.stringify({ scripts: { verify: 'node verify.cjs' } }));
+  const cap = await setup(cwd); const writer = await bind(cwd, cap, 'writer', 'writer');
+  await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: 'descendant', data: { label: 'verify' } });
+  const s = await inspect(cwd); assert.equal(s.commands.at(-1).status, 'UNCERTAIN'); assert.equal(s.phase, 'BLOCKED_UNCERTAIN');
+  await assert.rejects(call(cwd, cap, 'confirm-quiescent', { observations: [{ id: 'writer', status: 'stop-acknowledged', noExternalProcesses: true, source: 'fixture', observedAt: Date.now() }] }), /positive actor/);
+  await new Promise(resolve => setTimeout(resolve, 2600)); // Fixture descendant self-exits; no reused PID is signalled.
   await assert.rejects(setup(cwd), /EEXIST/);
 }));
