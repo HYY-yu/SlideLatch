@@ -3,12 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --hostname 127.0.0.1 --port 3000",
+    "dev": "next dev --hostname 127.0.0.1 --port 3000",
     "build": "next build",
     "build:cloudflare": "CLOUDFLARE_BUILD=1 next build",
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "dsl:check": "npm --prefix packages/ppt-dsl run check",
+    "dsl:test": "npm --prefix packages/ppt-dsl test",
+    "template:compile": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/compile-template.ts",
+    "template:select": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/select-template.ts",
+    "template:release": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs scripts/slidelatch-release.ts",
+    "deck:validate": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/validate-input.ts",
+    "deck:generate": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/generate-deck.ts",
+    "deck:verify": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/verify-deck.ts",
+    "check": "npm run typecheck && npm test && npm run workflow:check && npm run dsl:check && npm run dsl:test",
+    "workflow:check": "tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --allowImportingTsExtensions --esModuleInterop --skipLibCheck scripts/slidelatch-release.ts",
+    "ai:prepare": "node --experimental-strip-types scripts/slidelatch-ai.mjs prepare",
+    "ai:apply": "node --experimental-strip-types scripts/slidelatch-ai.mjs apply",
+    "ai:codex": "node --experimental-strip-types scripts/slidelatch-ai.mjs codex"
   },
   "dependencies": {
     "jszip": "^3.10.2",

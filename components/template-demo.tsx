@@ -12,6 +12,9 @@ import { boxFor, inverse, parentMatrix, point, worldFrame } from '@/lib/pptx/geo
 import { markError, markName, parseMark, type Mark } from '@/lib/pptx/dsl';
 import type { Box, LoadedTemplate, Patches, SourceNode } from '@/lib/pptx/types';
 import SvgSlide from './pptx/svg-slide';
+import WorkflowPanel from './pptx/workflow-panel';
+import DeckStudio from './pptx/deck-studio';
+import type { BoundaryProbe } from '@/lib/workflow/session';
 import ListObjects from './pptx/list-objects';
 import ListSettings from './pptx/list-settings';
 import { groupedModel, editListMembers } from '@/lib/pptx/grouping';
@@ -32,11 +35,16 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
   const [groupMode,setGroupMode]=useState<{listKey:string;item:number;keys:string[]}|null>(null);
   const [nameDraft,setNameDraft]=useState(''),[exporting,setExporting]=useState(false),[download,setDownload]=useState<string|null>(null);
   const [exportReport,setExportReport]=useState('');
+  const [fileName,setFileName]=useState(''),[fileSession,setFileSession]=useState(0);
+  const inputRef=useRef<HTMLInputElement>(null),loadVersion=useRef(0);
+  const outputName=(fileName||'slidelatch-template.pptx').replace(/\.pptx$/i,'')+'-marked.pptx';
   const [previewLengths,setPreviewLengths]=useState<Record<string,number>>({});
   const [contentDraft,setContentDraft]=useState<{key:string;value:string}|null>(null);
   const svgRef=useRef<SVGSVGElement>(null),overviewRef=useRef<HTMLDialogElement>(null),exportDialogRef=useRef<HTMLDialogElement>(null),downloadRef=useRef<string|null>(null);
   const objectListRef=useRef<HTMLDivElement>(null),selectedObjectRef=useRef<HTMLButtonElement>(null);
   const [listPreviews,setListPreviews]=useState<Record<string,number>>({});
+  const [workflowPreview,setWorkflowPreview]=useState<BoundaryProbe|null>(null);
+  const [capacityPreview,setCapacityPreview]=useState<{key:string;text:string}|null>(null);
   const patches=transient||history.current;
   const source=model?.slides[page];
   const node=source?.nodes.find(node=>node.key===selected);
@@ -72,7 +80,7 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
     setGroupMode({listKey:selectedList.key,item:item.index,keys});setError('');
   }
   function selectObject(key:string|null){
-    if(!groupMode){setSelectionKind('node');setSelected(key);return;}
+    if(!groupMode){setWorkflowPreview(null);setSelectionKind('node');setSelected(key);return;}
     if(!key||!editableMembers.some(n=>n.key===key))return;
     setGroupMode(state=>state?{...state,keys:state.keys.includes(key)?state.keys.filter(k=>k!==key):[...state.keys,key]}:null);
   }
@@ -99,8 +107,10 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
       if(previewLengths[n.key]!==undefined)result[n.key]=previewText(content,previewLengths[n.key]);
       else if(edited!==undefined)result[n.key]=edited;
     }
+    if(workflowPreview?.kind==='text')result[workflowPreview.key]=workflowPreview.text??'';
+    if(capacityPreview)result[capacityPreview.key]=capacityPreview.text;
     return result;
-  },[model,previewLengths,history.current,contentDraft]);
+  },[model,previewLengths,history.current,contentDraft,workflowPreview,capacityPreview]);
   const mark=parseMark(nameDraft),draftInvalid=markError(mark);
   const hasMark=currentName.trim().startsWith('@');
   useEffect(()=>setNameDraft(currentName),[selected,currentName]);
@@ -138,15 +148,31 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
     commit({...history.current,[node.key]:{...history.current[node.key],...change}});
     console.debug('[SlideLatch] template.patch',{slide:page+1,shapeId:node.id,fields:Object.keys(change)});
   }
+  function installTemplate(result:LoadedTemplate,name:string){
+    if(downloadRef.current){URL.revokeObjectURL(downloadRef.current);downloadRef.current=null;}
+    setModel(result);setFileName(name);setFileSession(value=>value+1);setHistory({past:[],current:{},future:[]});
+    setPage(0);setSelected(result.slides[0]?.nodes.find(n=>n.marked)?.key||null);setSelectionKind('node');
+    setTransient(null);setGroupMode(null);setContentDraft(null);setPreviewLengths({});setListPreviews({});
+    setMarkedOnly(false);setNameDraft('');setDownload(null);setExportReport('');setPhase(1);
+  }
   async function openTemplate() {
     if(model){setPhase(1);return;}
-    setLoading(true);setError('');
+    const version=++loadVersion.current;setLoading(true);setError('');
     try{
       const response=await fetch(template.downloadUrl);if(!response.ok)throw new Error(`TEMPLATE_HTTP_${response.status}`);
       const result=await loadTemplate(await response.arrayBuffer());
       if(result.sha256!==template.sha256)throw new Error('TEMPLATE_HASH_MISMATCH');
-      trackOnce('workbench-started','workbench_started');setModel(result);setSelected(result.slides[0].nodes.find(n=>n.marked)?.key||null);setPhase(1);
-    }catch(cause){console.error('[SlideLatch] demo.load.failed',cause);setError(t.loadError);}finally{setLoading(false);}
+      if(version!==loadVersion.current)return;
+      trackOnce('workbench-started','workbench_started');installTemplate(result,template.downloadUrl.split('/').pop()||'demo.pptx');
+    }catch(cause){if(version===loadVersion.current){console.error('[SlideLatch] demo.load.failed',cause);setError(t.loadError);}}finally{if(version===loadVersion.current)setLoading(false);}
+  }
+  async function openLocalFile(file:File){
+    const version=++loadVersion.current;setLoading(true);setError('');
+    try{
+      if(!/\.pptx$/i.test(file.name)||!file.size||file.size>50*1024*1024)throw new Error('PPTX_FILE_LIMIT');
+      const result=await loadTemplate(await file.arrayBuffer());
+      if(version===loadVersion.current)installTemplate(result,file.name);
+    }catch(cause){if(version===loadVersion.current){console.error('[SlideLatch] local.load.failed',cause);setError(locale==='zh'?'无法读取此 PPTX。请选择有效的 .pptx 文件（最多 50 MB、200 页，解压后最多 200 MB）。原有编辑已保留。':'Could not read this PPTX. Choose a valid .pptx (up to 50 MB, 200 slides, 200 MB expanded). Existing edits are preserved.');}}finally{if(version===loadVersion.current)setLoading(false);}
   }
   function addMark(){
     if(!node||!source)return;
@@ -171,7 +197,7 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
     updateMark(change);
     setPreviewLengths(state=>({...state,[node.key]:value}));
   }
-  function changePage(index:number){setSelectionKind('node');setGroupMode(null);setPage(index);setSelected(model?.slides[index].nodes.find(n=>(history.current[n.key]?.name??n.name).startsWith('@'))?.key||null);}
+  function changePage(index:number){setWorkflowPreview(null);setSelectionKind('node');setGroupMode(null);setPage(index);setSelected(model?.slides[index].nodes.find(n=>(history.current[n.key]?.name??n.name).startsWith('@'))?.key||null);}
   function resetPosition(){
     if(!node||!history.current[node.key]?.box)return;
     const next={...history.current},patch={...next[node.key]};
@@ -201,7 +227,7 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
     return ()=>window.removeEventListener('keydown',onKeyDown);
   },[phase,exporting,transient,groupMode]);
   function drag(event:PointerEvent<SVGElement>,target:SourceNode,mode:'move'|'resize'){
-    if(groupMode||!source||!svgRef.current||!target.box)return;
+    if(loading||groupMode||!source||!svgRef.current||!target.box)return;
     const svg=svgRef.current,ctm=svg.getScreenCTM();if(!ctm)return;
     event.preventDefault();const start=point([ctm.inverse().a,ctm.inverse().b,ctm.inverse().c,ctm.inverse().d,ctm.inverse().e,ctm.inverse().f],event.clientX,event.clientY);
     const before=history.current,b=boxFor(target,before)!;
@@ -227,6 +253,7 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
       const bytes=await writePptx(model.bytes,exportPatches);
       const {readSourceSlides}=await import('@/lib/pptx/xml');const check=await readSourceSlides(bytes);
       for(const [key,patch] of Object.entries(exportPatches)){
+        if(patch.pageContract){const written=check.find(slide=>`${slide.path}#@page`===key)?.pageContract;if(JSON.stringify(written)!==JSON.stringify(patch.pageContract))throw new Error('EXPORT_PAGE_CONTRACT_MISMATCH');continue;}
         const written=check.flatMap(slide=>slide.nodes).find(node=>node.key===key);
         if(!written||patch.name!==undefined&&written.name!==patch.name)throw new Error('EXPORT_TAG_MISMATCH');
         if(patch.group){
@@ -237,7 +264,7 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
         if(patch.text!==undefined&&written.text!==patch.text)throw new Error('EXPORT_TEXT_MISMATCH');
         if(patch.box&&(!written.box||Object.keys(patch.box).some(k=>Math.abs(written.box![k as keyof Box]-patch.box![k as keyof Box])>1/12700+.000001)))throw new Error('EXPORT_GEOMETRY_MISMATCH');
       }
-      if(check.length!==33)throw new Error('EXPORT_SLIDE_COUNT');
+      if(check.length!==model.slides.length)throw new Error('EXPORT_SLIDE_COUNT');
       if(downloadRef.current)URL.revokeObjectURL(downloadRef.current);
       const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'}));downloadRef.current=url;setDownload(url);
       setExportReport(`${check.length} ${locale==='zh'?'页':'slides'} · ${count} ${t.changed}`);setPhase(2);exportDialogRef.current?.close();
@@ -247,10 +274,12 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
   return <section id="demo" className="demo-wrap interactive-demo pptx-workbench reveal" aria-labelledby="demo-title">
     <div id="workflow" className="demo-intro"><h2 id="demo-title">{t.title}</h2><p>{t.note}</p></div>
     <div className="demo-workspace">
+      <input ref={inputRef} type="file" accept=".pptx" hidden aria-label={locale==='zh'?'选择本地 PPTX':'Choose local PPTX'} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void openLocalFile(file)}}/>
+      <div className="pptx-toolbar"><button type="button" className="button button-secondary" disabled={loading||exporting||!!transient||!!groupMode} onClick={()=>inputRef.current?.click()}>{loading?t.loading:locale==='zh'?'打开本地 PPTX':'Open local PPTX'}</button><small>{locale==='zh'?'仅在浏览器中处理，不上传文件。最多 50 MB / 200 页。':'Processed in this browser, never uploaded. Up to 50 MB / 200 slides.'}</small></div>
       <ol className="demo-stepper" aria-label={t.title}>{t.steps.map((label,i)=><li key={label}><button type="button" disabled={exporting||i>0&&!model} aria-current={phase===i?'step':undefined} onClick={()=>changeStep(i)}><span>{i<phase?'✓':`0${i+1}`}</span>{label}</button></li>)}</ol>
-      {phase===0&&<div className="pptx-choose"><div><img src={template.overview} alt={t.overview}/></div><aside><p className="eyebrow">01</p><h3>{t.template}</h3><p>{t.chooseHint}</p><button className="button button-primary" onClick={openTemplate} disabled={loading}>{loading?t.loading:t.choose}<span aria-hidden="true">→</span></button><button className="upload-disabled" disabled title={t.developing}>↑ {t.upload}</button><small>{t.developing}</small></aside></div>}
+      {phase===0&&<div className="pptx-choose"><div><img src={template.overview} alt={t.overview}/></div><aside><p className="eyebrow">01</p><h3>{t.template}</h3><p>{t.chooseHint}</p><button className="button button-primary" onClick={openTemplate} disabled={loading}>{loading?t.loading:t.choose}<span aria-hidden="true">→</span></button></aside></div>}
       {phase===1&&model&&source&&<>
-        <div className="pptx-toolbar"><div><strong>{t.template}</strong><span>{page+1} / 33</span><button onClick={()=>overviewRef.current?.showModal()}>{t.preview} ↗</button></div><button className="pptx-next-step" disabled={exporting} onClick={()=>changeStep(2)}>{t.nextStep} <span aria-hidden="true">→</span></button></div>
+        <div className="pptx-toolbar"><div><strong>{fileName||t.template}</strong><span>{page+1} / {model.slides.length}</span><button onClick={()=>overviewRef.current?.showModal()}>{t.preview} ↗</button></div><button className="pptx-next-step" disabled={exporting} onClick={()=>changeStep(2)}>{t.nextStep} <span aria-hidden="true">→</span></button></div>
         <div className="pptx-editor-layout">
           <nav className="pptx-thumbnails" aria-label={locale==='zh'?'PPT 页面列表':'Slide list'}>{model.slides.map((slide,i)=><button key={slide.path} className={page===i?'active':''} onClick={()=>changePage(i)} aria-label={`${t.page} ${i+1}`} aria-current={page===i?'page':undefined}><span className="thumb-number">{String(i+1).padStart(2,'0')}</span><SvgSlide model={model} slideIndex={i} patches={history.current} locale={locale} textPreviews={textPreviews}/></button>)}</nav>
           <div className="pptx-stage"><div className="pptx-canvas-actions" role="toolbar" aria-label={t.operations}>
@@ -260,7 +289,7 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
             <button disabled={!node||!history.current[node.key]?.box} onClick={resetPosition}>{t.resetPosition}</button>
             <button disabled={!patchCount&&!Object.keys(listPreviews).length&&!Object.keys(previewLengths).length&&!contentDirty&&nameDraft===currentName} onClick={resetAll}>{t.resetAll}</button>
             <span className="canvas-patch-count">{patchCount} {t.changed}</span>
-          </div><div className="pptx-canvas"><SvgSlide model={model} slideIndex={page} patches={patches} selected={groupMode?null:selected} selectedMembers={groupMode?.keys} interactive onSelect={selectObject} onSelectItem={selectListItem} onDrag={drag} svgRef={svgRef} locale={locale} textPreviews={textPreviews} listPreviews={listPreviews} onListPreview={previewList}/></div><div className="pptx-stage-status"><span className="pptx-status-identity">{t.page} {page+1}</span><span className="pptx-status-hint">{t.readonly}</span><span className="pptx-status-dimensions">960 × 540 pt</span></div></div>
+          </div><div className="pptx-canvas"><SvgSlide model={model} slideIndex={page} patches={patches} selected={groupMode?null:selected} selectedMembers={groupMode?.keys} interactive onSelect={selectObject} onSelectItem={selectListItem} onDrag={drag} svgRef={svgRef} locale={locale} textPreviews={textPreviews} listPreviews={workflowPreview?.kind==='list'&&workflowPreview.listKey?{[workflowPreview.listKey]:workflowPreview.value}:listPreviews} onListPreview={previewList}/></div><div className="pptx-stage-status"><span className="pptx-status-identity">{t.page} {page+1}</span><span className="pptx-status-hint">{t.readonly}</span><span className="pptx-status-dimensions">{Math.round(model.deck.size.width)} × {Math.round(model.deck.size.height)} pt</span></div></div>
           <aside className="pptx-properties">
             <section className="pptx-objects-region" aria-label={t.objects}>
             <div className="pptx-object-header"><h3>{t.objects}</h3><label><input type="checkbox" checked={markedOnly} onChange={e=>setMarkedOnly(e.target.checked)}/>{t.markedOnly}</label></div>
@@ -281,17 +310,19 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
             </section>:<section className="pptx-inspector-body" aria-label={t.mark}><h3>{t.mark}</h3><p className="pptx-empty">{t.select}</p></section>}
           </aside>
         </div>
+        <WorkflowPanel editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])} svgRef={svgRef} onCapacityPreview={setCapacityPreview} key={fileSession} model={model} patches={history.current} locale={locale} fileName={fileName} visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}} onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}}/>
         {(issues.length>0||model.mappingWarnings.length>0)&&<div className="pptx-validation" role="status"><strong>{model.mappingWarnings.length?t.mapping:t.validation}</strong><span>{[...model.mappingWarnings,...issues.map(issueText)].slice(0,4).join(' · ')}</span></div>}
       </>}
-      {phase===2&&download&&<div className="pptx-export-result"><span className="export-check">✓</span><h3>{t.done}</h3><p>{t.doneHint}</p><small>{exportReport}</small><a className="button button-primary" href={download} onClick={()=>track('workbench_download_clicked')} download={locale==='en'?'minimal-business-slidelatch-en.pptx':'minimal-business-slidelatch.pptx'}>{t.download} ↓</a><button className="demo-reset" onClick={()=>setPhase(1)}>{t.back} ↗</button></div>}
+      {phase===2&&download&&<div className="pptx-export-result"><span className="export-check">✓</span><h3>{t.done}</h3><p>{t.doneHint}</p><small>{exportReport}</small><a className="button button-primary" href={download} onClick={()=>track('workbench_download_clicked')} download={outputName}>{t.download} ↓</a><button className="demo-reset" onClick={()=>setPhase(1)}>{t.back} ↗</button></div>}
       {error&&<div className="pptx-error-message" role="alert">{error}{!model&&<button onClick={openTemplate}>{t.retry}</button>}</div>}
     </div>
+    <DeckStudio locale={locale} model={model} patches={history.current} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} fileName={fileName}/>
     <dialog ref={exportDialogRef} className="pptx-export-confirm" aria-labelledby="export-confirm-title" onCancel={event=>{if(exporting)event.preventDefault()}}>
       <h3 id="export-confirm-title">{t.confirmExportTitle}</h3><p>{t.confirmExportHint}</p>
       {exportBlocked&&<p className="pptx-error" role="alert">{model?.mappingWarnings.length?t.mapping:t.validation}</p>}
       {error&&<p className="pptx-error" role="alert">{error}</p>}
       <div><button className="button button-secondary" disabled={exporting} onClick={()=>exportDialogRef.current?.close()}>{t.cancelExport}</button><button className="button button-primary" disabled={exporting||exportBlocked} onClick={()=>exportTemplate(pendingExportPatches)}>{exporting?t.exporting:t.confirmExport}</button></div>
     </dialog>
-    <dialog ref={overviewRef} className="template-overview" aria-labelledby="overview-title" onClick={e=>{if(e.target===e.currentTarget)overviewRef.current?.close()}}><div className="overview-content"><div className="overview-header"><h3 id="overview-title">{t.overview}</h3><div><a href={template.overview} target="_blank" rel="noopener noreferrer">{t.full} ↗</a><button onClick={()=>overviewRef.current?.close()} aria-label={t.close}>×</button></div></div><div className="overview-image"><img src={template.overview} alt={t.overview} width={3840} height={2160}/></div></div></dialog>
+    <dialog ref={overviewRef} className="template-overview" aria-labelledby="overview-title" onClick={e=>{if(e.target===e.currentTarget)overviewRef.current?.close()}}><div className="overview-content"><div className="overview-header"><h3 id="overview-title">{t.overview}</h3><div><button onClick={()=>overviewRef.current?.close()} aria-label={t.close}>×</button></div></div><div className="overview-image">{model?model.slides.map((slide,index)=><div key={slide.path}><p>{index+1} / {model.slides.length}</p><SvgSlide model={model} slideIndex={index} patches={history.current} locale={locale}/></div>):<img src={template.overview} alt={t.overview} width={3840} height={2160}/>}</div></div></dialog>
   </section>;
 }

@@ -1,11 +1,26 @@
+import JSZip from 'jszip';
 import { readSourceSlides } from './xml';
 import type { LoadedTemplate, RenderDeck, RenderElement } from './types';
 
 export async function loadTemplate(bytes:ArrayBuffer):Promise<LoadedTemplate> {
   const started=performance.now();
+  if(!bytes.byteLength||bytes.byteLength>50*1024*1024)throw new Error('PPTX_SIZE_LIMIT');
+  // Bound declared ZIP expansion before handing entries to either XML or render parsers.
+  const archive=await JSZip.loadAsync(bytes);
+  const entries=Object.values(archive.files);
+  if(entries.length>5000)throw new Error('PPTX_ENTRY_LIMIT');
+  let expanded=0;
+  for(const entry of entries){
+    const size=(entry as unknown as {_data?:{uncompressedSize?:number}})._data?.uncompressedSize??0;
+    if(!Number.isSafeInteger(size)||size<0)throw new Error('PPTX_INVALID_ENTRY');
+    expanded+=size;
+    if(expanded>200*1024*1024)throw new Error('PPTX_EXPANSION_LIMIT');
+  }
+  const sourceSlides=await readSourceSlides(bytes);
+  if(!sourceSlides.length||sourceSlides.length>200)throw new Error('PPTX_SLIDE_LIMIT');
   console.info('[SlideLatch] template.parse.start',{bytes:bytes.byteLength});
   try {
-    const [{parse},slides]=await Promise.all([import('pptxtojson'),readSourceSlides(bytes)]);
+    const [{parse},slides]=await Promise.all([import('pptxtojson'),Promise.resolve(sourceSlides)]);
     const deck=await parse(bytes,{imageMode:'base64',videoMode:'none',audioMode:'none'}) as unknown as RenderDeck;
     if(deck.slides.length!==slides.length)throw new Error('SLIDE_COUNT_MISMATCH');
     const warnings:string[]=[];
