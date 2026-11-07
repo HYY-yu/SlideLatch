@@ -57,7 +57,7 @@
 
 ## GitHub CI 与边界
 
-工作流仅由 pull_request、main push 和 workflow_dispatch 触发，使用 Node 24。
+工作流仅由 pull_request、main push 和 workflow_dispatch 触发。完整 verify 使用 Node 24；独立 Cloudflare 安装检查匹配故障日志中的 Node 22.23.4 与 npm 10.9.9，并显式输出和断言版本。
 
 - `cloudflare-root-install` 在独立 runner 仅运行根 `npm clean-install --progress=false`，确认没有 `packages/ppt-dsl/node_modules` 后运行 `npm run build:cloudflare`，复现 Cloudflare 的安装路径。根应用直接编译共享 DSL 源码，因此根 `dependencies` 必须声明这些源码需要的运行时包。
 - `verify` 仍分别按根目录与 packages/ppt-dsl 锁文件安装，再运行完整统一验证。
