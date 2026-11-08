@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { realpath, readFile, writeFile, mkdir, open } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { resolve, join, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { checkedPath, acquire, inspect, transition } from './loop-a-lifecycle.mjs';
@@ -12,6 +12,12 @@ export async function prepare(p, now = Date.now()) {
   requireValue(p.authorization?.trim() && p.owner?.trim() && p.publish === true, 'explicit authorization required');
   requireValue(sha(p.entrySha) && sha(p.baseSha), 'exact SHA required');
   requireValue(Number.isSafeInteger(p.startedAt) && p.startedAt <= now && now < p.startedAt + 1200000 && p.maxRepairs === 2, 'invalid budget');
+  requireValue(typeof p.invocationId === 'string' && p.invocationId.trim(), 'invocation identity required');
+  requireValue(typeof p.invocationRecord === 'string' && isAbsolute(p.invocationRecord), 'absolute immutable invocation record required');
+  const invocation = JSON.parse(await readFile(p.invocationRecord, 'utf8'));
+  requireValue(invocation.version === 1 && invocation.invocationId === p.invocationId && invocation.startedAt === p.startedAt && Number.isSafeInteger(invocation.recordedAt) && invocation.recordedAt >= invocation.startedAt && invocation.recordedAt <= now, 'invocation budget mismatch');
+  const registry = await invocationRegistry(p.worktree, p.invocationId);
+  requireValue(JSON.stringify(invocation) === await readFile(registry.file, 'utf8'), 'invocation registry mismatch');
   const cwd = await realpath(p.worktree), entry = await realpath(p.entryRoot);
   const common = await realpath(resolve(cwd, git(cwd, 'rev-parse', '--git-common-dir')));
   requireValue(await realpath(resolve(entry, git(entry, 'rev-parse', '--git-common-dir'))) === common, 'entry and target repository differ');
@@ -39,7 +45,7 @@ export async function admit(p, cap) {
   throw Error('BLOCKED_DEADLINE: empty lease cancelled before dispatch');
 }
 async function invocationRegistry(worktree, invocationId) {
-  requireValue(typeof worktree === 'string' && typeof invocationId === 'string' && invocationId.length, 'worktree and invocation identity required');
+  requireValue(typeof worktree === 'string' && typeof invocationId === 'string' && invocationId.trim(), 'worktree and invocation identity required');
   const cwd = await realpath(worktree);
   const common = await realpath(resolve(cwd, git(cwd, 'rev-parse', '--git-common-dir')));
   const directory = join(common, 'loop-a-invocations');
@@ -64,11 +70,6 @@ export async function beginInvocation(file, input = {}, now = Date.now()) {
   return record;
 }
 export async function acquireOnce(input, capabilityFile) {
-  requireValue(typeof input.invocationRecord === 'string', 'immutable invocation record required');
-  const invocation = JSON.parse(await readFile(input.invocationRecord, 'utf8'));
-  requireValue(invocation.version === 1 && invocation.invocationId === input.invocationId && invocation.startedAt === input.startedAt && invocation.recordedAt >= invocation.startedAt && invocation.recordedAt <= Date.now(), 'invocation budget mismatch');
-  const registry = await invocationRegistry(input.worktree, input.invocationId);
-  requireValue(JSON.stringify(invocation) === await readFile(registry.file, 'utf8'), 'invocation registry mismatch');
   const p = await prepare(input);
   const timeoutMs = p.deadline - Date.now() - 1000;
   requireValue(timeoutMs > 0, 'insufficient remaining deadline');
