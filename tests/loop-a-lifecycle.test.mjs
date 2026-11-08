@@ -167,6 +167,59 @@ test('deadline supervisor stops only its live process group and retains lease', 
   assert.equal(s.commands[0].status, 'EXITED');
   await assert.rejects(setup(cwd), /EEXIST/);
 }));
+test('supervisor observes a delayed group exit without signalling after leader exit', t => fixture(async cwd => {
+  const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+  await writeFile(join(cwd, 'verify.cjs'), `process.on('SIGTERM', () => setTimeout(() => process.exit(0), 150)); setInterval(() => {}, 1000);`);
+  await writeFile(join(cwd, 'package.json'), JSON.stringify({ scripts: { verify: 'node verify.cjs' } }));
+  const cap = await acquire(cwd, { issue: 17, owner: 'fixture', authorization: 'fixture', paths: ['file'], timeoutMs: 1800 });
+  const writer = await bind(cwd, cap, 'writer', 'writer');
+  const deadline = (await inspect(cwd)).deadline;
+  const kill = process.kill.bind(process);
+  let observed = false, observedExistingGroup = false;
+  t.mock.method(process, 'kill', (pid, signal) => {
+    if (observed) assert.equal(signal, 0, 'leader exit must end authority to send signals');
+    if (signal === 0) observed = true;
+    const result = kill(pid, signal);
+    if (signal === 0) observedExistingGroup = true;
+    return result;
+  });
+  try {
+    await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: 'delayed-exit', data: { label: 'verify' } });
+    const s = await inspect(cwd);
+    assert(observedExistingGroup, 'fixture must exercise a group still present after leader exit');
+    assert.equal(s.commands[0].status, 'EXITED');
+    assert.equal(s.commands[0].exit.groupGone, true);
+    assert.equal(s.deadline, deadline);
+    await assert.rejects(setup(cwd), /EEXIST/);
+  } finally {
+    // Only this synthetic descendant self-exits; never signal a numeric PID after leader exit.
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+}));
+
+for (const observation of ['present', 'EPERM', 'EIO']) {
+  test(`supervisor retains lease when group observation remains ${observation}`, t => fixture(async cwd => {
+    const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+    const cap = await setup(cwd); const writer = await bind(cwd, cap, 'writer', 'writer');
+    let probes = 0;
+    t.mock.method(process, 'kill', (pid, signal) => {
+      assert(pid < 0); assert.equal(signal, 0, 'an exited leader never authorizes a signal');
+      probes++;
+      if (observation !== 'present') throw Object.assign(new Error('synthetic observation failure'), { code: observation });
+      return true;
+    });
+    const start = performance.now();
+    await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: `group-${observation}`, data: { label: 'verify' } });
+    assert(performance.now() - start < 5000, 'observation must have a bounded budget');
+    assert(probes > 0 && probes <= 50, 'observation cannot poll indefinitely');
+    const s = await inspect(cwd);
+    assert.equal(s.commands[0].status, 'UNCERTAIN');
+    assert.equal(s.commands[0].exit.groupGone, false);
+    assert.equal(s.phase, 'BLOCKED_UNCERTAIN');
+    await assert.rejects(call(cwd, cap, 'confirm-quiescent', { observations: [{ id: 'writer', status: 'stop-acknowledged', noExternalProcesses: true, source: 'synthetic fixture', observedAt: Date.now() }] }), /positive actor/);
+    await assert.rejects(setup(cwd), /EEXIST/);
+  }));
+}
 test('worker cannot forge supervisor exit, and inspect exposes no supervisor nonce', () => fixture(async cwd => {
   const cap = await setup(cwd); const writer = await bind(cwd, cap, 'writer', 'writer');
   await assert.rejects(call(cwd, writer, 'command-intent', { label: 'verify', nonce: 'forged' }), /supervisor-only/);
