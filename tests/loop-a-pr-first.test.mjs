@@ -17,7 +17,7 @@ test('work distinguishes optional Issue from user authorization and generated sc
  assert.deepEqual(validateWork(work, 100), work);
  for (const patch of [{ authorizationSource: '' }, { scopeSource: '' }, { target: { ...target, authors: [] } }, { target: { ...target, headRef: '' } }]) assert.throws(() => validateWork({ ...work, ...patch }, 100));
 });
-const snapshot = () => ({ ...target, draft: false, state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: 'APPROVED', checksComplete: true, requiredChecks: ['verify'], checks: [{ name: 'verify', conclusion: 'success', head: mergeSha, source: 'GitHub check' }], run: 'run', ciMergeSha: mergeSha, acceptance: { head, base, passed: true, evidence: 'independent acceptance' } });
+const snapshot = () => ({ ...target, draft: false, state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: 'APPROVED', checksComplete: true, requiredChecks: { names: [], source: 'GitHub branch rules read', observedAt: 100 }, checks: ['verify', 'cloudflare-root-install'].map(name => ({ name, conclusion: 'success', head: mergeSha, source: 'GitHub check' })), run: 'run', ciMergeSha: mergeSha, acceptance: { head, base, passed: true, evidence: 'independent acceptance' } });
 test('merge checks fresh head/base, exact CI, unresolved reviews and native acceptance', () => {
  const state = { head, pr: target, ci: { head, base, mergeSha, run: 'run' }, review: { head, base, passed: true } };
  assert.equal(validateMergeSnapshot(snapshot(), state, 100).head, head);
@@ -109,7 +109,7 @@ test('existing PR repair uses managed writer and a fresh independent reviewer wi
 }));
 test('merge uncertainty retains lease and production must use actual ordinary merge SHA', () => fixture(async f => {
  await f.review();
- const snapshot = { ...work.target, ...await f.remote(), number: 20, state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: null, checksComplete: true, requiredChecks: ['verify'], checks: [{ name: 'verify', conclusion: 'success', head: mergeSha, source: 'GitHub' }], ciMergeSha: mergeSha, acceptance: { head: f.head, base: f.base, passed: true, evidence: 'independent domain acceptance' } };
+ const snapshot = { ...work.target, ...await f.remote(), number: 20, state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: null, checksComplete: true, requiredChecks: { names: [], source: 'GitHub branch rules read', observedAt: Date.now() }, checks: ['verify', 'cloudflare-root-install'].map(name => ({ name, conclusion: 'success', head: mergeSha, source: 'GitHub' })), ciMergeSha: mergeSha, acceptance: { head: f.head, base: f.base, passed: true, evidence: 'independent domain acceptance' } };
  await f.call('merge-intent', snapshot);
  assert.equal((await inspect(f.cwd)).shipping.intent.expected_head_sha, f.head);
  await assert.rejects(f.call('merge-intent', snapshot), /reconciled/);
@@ -136,7 +136,7 @@ test('merge uncertainty retains lease and production must use actual ordinary me
 }));
 test('official merge denial is retained, cannot retry, and reports blocked rather than success', () => fixture(async f => {
  await f.review();
- const snapshot = { ...target, ...await f.remote(), state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: null, checksComplete: true, requiredChecks: ['verify'], checks: [{ name: 'verify', conclusion: 'success', head: mergeSha, source: 'GitHub' }], ciMergeSha: mergeSha, acceptance: { head: f.head, base: f.base, passed: true, evidence: 'acceptance' } };
+ const snapshot = { ...target, ...await f.remote(), state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: null, checksComplete: true, requiredChecks: { names: [], source: 'GitHub branch rules read', observedAt: Date.now() }, checks: ['verify', 'cloudflare-root-install'].map(name => ({ name, conclusion: 'success', head: mergeSha, source: 'GitHub' })), ciMergeSha: mergeSha, acceptance: { head: f.head, base: f.base, passed: true, evidence: 'acceptance' } };
  await f.call('merge-intent', snapshot);
  await f.call('record-merge', { outcome: 'denied', head: f.head, base: f.base, url: target.url, sha: null, source: 'official permission denial', observedAt: Date.now() });
  await assert.rejects(f.call('merge-intent', snapshot), /reconciled/);
@@ -146,7 +146,7 @@ test('official merge denial is retained, cannot retry, and reports blocked rathe
 
 test('known merge releases locally as pending and a new observer cannot reuse or mutate the old lease', () => fixture(async f => {
  await f.review();
- const snapshot = { ...target, ...await f.remote(), state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: null, checksComplete: true, requiredChecks: ['verify'], checks: [{ name: 'verify', conclusion: 'success', head: mergeSha, source: 'GitHub' }], ciMergeSha: mergeSha, acceptance: { head: f.head, base: f.base, passed: true, evidence: 'acceptance' } };
+ const snapshot = { ...target, ...await f.remote(), state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: null, checksComplete: true, requiredChecks: { names: [], source: 'GitHub branch rules read', observedAt: Date.now() }, checks: ['verify', 'cloudflare-root-install'].map(name => ({ name, conclusion: 'success', head: mergeSha, source: 'GitHub' })), ciMergeSha: mergeSha, acceptance: { head: f.head, base: f.base, passed: true, evidence: 'acceptance' } };
  await f.call('merge-intent', snapshot);
  const actualMergeSha = 'e'.repeat(40);
  await f.call('record-merge', { outcome: 'merged', head: f.head, base: f.base, url: target.url, sha: actualMergeSha, parents: [f.base, f.head], source: 'official merge result', observedAt: Date.now() });
@@ -159,6 +159,7 @@ test('known merge releases locally as pending and a new observer cannot reuse or
  const evidence = { ...remote, observedAt: future, production, observer: { id: 'new-coordinator', source: 'native host identity', observedAt: future } };
  const result = observeDeployment(f.plan, archive, evidence, future);
  assert.equal(result.status, 'OBSERVED'); assert.equal(result.outcome, 'DEPLOYED'); assert.equal(result.originEpoch, archive.epoch); assert.equal(result.observer.id, 'new-coordinator');
+ assert.equal(observeDeployment(f.plan, archive, { ...evidence, observer: { ...evidence.observer, id: archive.owner } }, future).observer.id, archive.owner);
  assert.equal((await f.archive()).deadline, archive.deadline);
  for (const patch of [{ observer: null }, { production: { ...production, sha: mergeSha } }, { production: { ...production, environment: 'preview' } }, { production: { ...production, regression: null } }, { actualMergeSha: mergeSha }]) assert.throws(() => observeDeployment(f.plan, archive, { ...evidence, ...patch }, future));
  const successor = await acquire(f.cwd, { ...f.plan.acquire, owner: 'new-owner', timeoutMs: 10000 });
@@ -198,3 +199,75 @@ test('new implementation runs Issue-free managed commit and independent acceptan
  const remote = await f.remote(); await f.call('release');
  assert.equal(complete(f.plan, await f.archive(), remote).outcome, 'DRAFT_READY');
 }, { existing: false }));
+
+test('project CI minimum cannot be lowered by the merge caller', () => {
+ const state = { head, pr: target, ci: { head, base, mergeSha, run: 'run' }, review: { head, base, passed: true } };
+ const incomplete = { ...snapshot(), checks: snapshot().checks.filter(c => c.name !== 'cloudflare-root-install') };
+ assert.throws(() => validateMergeSnapshot(incomplete, state, 100), /checks/);
+});
+
+test('post-deadline shipping rejects new business without changing pending outcome', () => fixture(async f => {
+ await f.review();
+ const snapshot = { ...target, ...await f.remote(), state: 'OPEN', mergeable: true, unresolved: 0, reviewDecision: null, checksComplete: true, requiredChecks: { names: [], source: 'GitHub branch rules read', observedAt: Date.now() }, checks: ['verify', 'cloudflare-root-install'].map(name => ({ name, conclusion: 'success', head: mergeSha, source: 'GitHub' })), ciMergeSha: mergeSha, acceptance: { head: f.head, base: f.base, passed: true, evidence: 'acceptance' } };
+ await f.call('merge-intent', snapshot);
+ const pending = await inspect(f.cwd);
+ const originalNow = Date.now;
+ Date.now = () => f.plan.deadline + 1;
+ try {
+  for (const action of ['merge-intent', 'dispatch-intent', 'repair', 'request-stop', 'record-pr']) {
+   await assert.rejects(f.call(action, snapshot), /reconciled/);
+   assert.deepEqual(await inspect(f.cwd), pending);
+  }
+  await f.call('record-merge', { outcome: 'merged', head: f.head, base: f.base, url: target.url, sha: 'f'.repeat(40), parents: [f.base, f.head], source: 'official merge read', observedAt: Date.now() });
+  const merged = await inspect(f.cwd);
+  assert.equal(merged.phase, 'MERGED');
+  await assert.rejects(f.call('merge-intent', snapshot), /reconciled/);
+  assert.deepEqual(await inspect(f.cwd), merged);
+  const at = Date.now(), actualMergeSha = 'f'.repeat(40);
+  const production = { sha: actualMergeSha, environment: 'production', status: 'success', build: 'success', provider: 'Cloudflare', id: 'deployment', url: 'https://example.invalid', source: 'provider result', observedAt: at, regression: { sha: actualMergeSha, environment: 'production', passed: true, source: 'live regression', observedAt: at } };
+  await f.call('record-deployment', production);
+  const deployed = await inspect(f.cwd);
+  assert.equal(deployed.phase, 'DEPLOYED');
+  await assert.rejects(f.call('repair', { evidence: 'must not restart business' }), /reconciled/);
+  assert.deepEqual(await inspect(f.cwd), deployed);
+  const remote = { ...await f.remote(), merged: true, actualMergeSha, production };
+  await f.call('release');
+  assert.equal(complete(f.plan, await f.archive(), remote).outcome, 'DEPLOYED');
+ } finally { Date.now = originalNow; }
+}));
+
+test('known empty platform requirements keep project checks while unreadable requirements block', () => {
+ const state = { head, pr: target, ci: { head, base, mergeSha, run: 'run' }, review: { head, base, passed: true } };
+ assert.equal(validateMergeSnapshot(snapshot(), state, 100).head, head);
+ for (const requiredChecks of [undefined, null, [], { names: [] }, { names: [], source: '', observedAt: 100 }, { names: [], source: 'GitHub', observedAt: -60000 }, { names: [], source: 'GitHub', observedAt: 101 }, { names: null, source: 'GitHub', observedAt: 100 }, { names: [], source: 'GitHub', observedAt: 100, status: 'failed' }]) assert.throws(() => validateMergeSnapshot({ ...snapshot(), requiredChecks }, state, 100), /required checks/);
+ for (const missing of ['verify', 'cloudflare-root-install']) {
+  const checks = snapshot().checks.filter(c => c.name !== missing);
+  assert.throws(() => validateMergeSnapshot({ ...snapshot(), checks, projectChecks: [] }, state, 100), /complete checks/);
+ }
+});
+
+test('platform checks add to the fixed project minimum and cannot pass as skipped or stale', () => {
+ const state = { head, pr: target, ci: { head, base, mergeSha, run: 'run' }, review: { head, base, passed: true } };
+ const d = { ...snapshot(), requiredChecks: { names: ['security'], source: 'GitHub rules', observedAt: 100 } };
+ assert.throws(() => validateMergeSnapshot(d, state, 100), /complete checks/);
+ const check = { name: 'security', conclusion: 'success', head, source: 'GitHub' };
+ assert.equal(validateMergeSnapshot({ ...d, checks: [...d.checks, check] }, state, 100).head, head);
+ for (const patch of [{ conclusion: 'skipped' }, { conclusion: 'failure' }, { conclusion: 'neutral' }, { head: base }, { source: '' }]) assert.throws(() => validateMergeSnapshot({ ...d, checks: [...d.checks, { ...check, ...patch }] }, state, 100), /complete checks/);
+});
+
+test('post-deadline known merge denial remains releasable without reopening business', () => fixture(async f => {
+ await f.review();
+ const d = { ...snapshot(), ...await f.remote(), requiredChecks: { names: [], source: 'GitHub rules read', observedAt: Date.now() }, acceptance: { head: f.head, base: f.base, passed: true, evidence: 'acceptance' } };
+ await f.call('merge-intent', d);
+ const originalNow = Date.now;
+ Date.now = () => f.plan.deadline + 1;
+ try {
+  await f.call('record-merge', { outcome: 'denied', head: f.head, base: f.base, url: target.url, sha: null, source: 'official permission denial', observedAt: Date.now() });
+  const denied = await inspect(f.cwd);
+  await assert.rejects(f.call('merge-intent', d), /reconciled/);
+  assert.deepEqual(await inspect(f.cwd), denied);
+  const remote = await f.remote();
+  await f.call('release');
+  assert.equal(complete(f.plan, await f.archive(), remote).outcome, 'MERGE_BLOCKED');
+ } finally { Date.now = originalNow; }
+}));

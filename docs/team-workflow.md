@@ -19,7 +19,7 @@ Issue 用于沟通和关联，不是开工条件。coordinator 根据实际代�
 3. 待独立验收。封存精确 head 后由非作者在另一干净 worktree 审查并完整 verify。已有 PR 的历史作者也不能自审。新工作先独立复核，后推送和创建 Draft PR。
 4. 验收通过或退回。记录 head/base、真实身份、命令、领域验收和证据。失败在原 scope 修复后重新验收，不降低门槛。
 5. 待合并。当前用户授权允许通过验收的 PR 普通合并。重新读取 head/base、CI、未决 review 和适用验收；用官方工具和 expected_head_sha。保留长集成历史，不需开启原生 auto_merge 或改仓库设置。
-6. 已合并或部署待续。实际 merge SHA 与 CI synthetic merge SHA 分开。正常 main 合并可启动部署；核对实际 production build、deployment 与线上回归。已确认 merge 且全员停写、命令退出后可本地释放，记录 DEPLOYMENT_PENDING。后轮以新身份只读同一归档与 SHA，不借旧能力、不重新合并或触发部署。
+6. 已合并或部署待续。实际 merge SHA 与 CI synthetic merge SHA 分开。正常 main 合并可启动部署；核对实际 production build、deployment 与线上回归。已确认 merge 且全员停写、命令退出后可本地释放，记录 DEPLOYMENT_PENDING。后轮以本轮真实身份只读同一归档与 SHA，不借旧能力、不重新合并或触发部署。
 
 验收记录放在 PR 评论或独立证据目录，记录目标代码 SHA，避免为了加入自身 SHA 再修改被验收提交。CI 的 PR merge 测试提交与 PR head 可能不同，必须同时记录 head 与 run 信息，不能拿旧绿色 run 证明新 head。
 

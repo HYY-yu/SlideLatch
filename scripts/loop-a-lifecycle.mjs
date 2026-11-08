@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { userInfo } from 'node:os';
 const SUPERVISOR = Symbol('private supervisor authority');
+const PROJECT_CHECKS = Object.freeze(['verify', 'cloudflare-root-install']);
 const environment = { PATH: `${dirname(process.execPath)}:/opt/homebrew/bin:/usr/bin:/bin`, HOME: userInfo().homedir, LANG: 'C.UTF-8', GIT_TERMINAL_PROMPT: '0' };
 const exec = promisify(execFile);
 const digest = x => createHash('sha256').update(JSON.stringify(x)).digest('hex');
@@ -29,7 +30,10 @@ export function validateMergeSnapshot(snapshot, state, now = Date.now()) {
   const d = snapshot, s = state;
   assert(d && d.number === s.pr.number && d.url === s.pr.url && d.head === s.head && d.base === s.pr.base && d.base === s.ci.base && d.baseRef === 'main' && s.pr.baseRef === 'main' && d.headRef === s.pr.headRef, 'fresh PR identity and base required');
   assert(d.state === 'OPEN' && d.draft === false && d.mergeable === true && d.unresolved === 0 && ['APPROVED', null].includes(d.reviewDecision) && d.source?.trim() && fresh(d.observedAt, now), 'merge readiness unavailable or stale');
-  assert(d.run === s.ci.run && d.ciMergeSha === s.ci.mergeSha && d.checksComplete === true && Array.isArray(d.requiredChecks) && d.requiredChecks.length && new Set(d.requiredChecks).size === d.requiredChecks.length && Array.isArray(d.checks) && d.requiredChecks.every(name => d.checks.some(c => c.name === name && c.conclusion === 'success' && [s.head, s.ci.mergeSha].includes(c.head) && c.source?.trim())) && d.checks.every(c => ['success', 'neutral', 'skipped'].includes(c.conclusion)), 'current complete checks required');
+  const platform = d.requiredChecks;
+  assert(platform && Object.keys(platform).sort().join() === 'names,observedAt,source' && Array.isArray(platform.names) && platform.names.every(name => typeof name === 'string' && name.trim()) && new Set(platform.names).size === platform.names.length && platform.source?.trim() && fresh(platform.observedAt, now), 'fresh platform required checks observation required');
+  const required = new Set([...PROJECT_CHECKS, ...platform.names]);
+  assert(d.run === s.ci.run && d.ciMergeSha === s.ci.mergeSha && d.checksComplete === true && Array.isArray(d.checks) && [...required].every(name => d.checks.some(c => c.name === name && c.conclusion === 'success' && [s.head, s.ci.mergeSha].includes(c.head) && c.source?.trim())) && d.checks.every(c => ['success', 'neutral', 'skipped'].includes(c.conclusion)), 'current complete checks required');
   assert(s.review?.head === s.head && s.review.base === d.base && d.acceptance?.head === s.head && d.acceptance.base === d.base && d.acceptance.passed === true && d.acceptance.evidence?.trim(), 'current base acceptance required');
   return d;
 }
@@ -158,6 +162,7 @@ export async function transition(cwd, request, internal = null) {
     assert(s.phase !== 'CANCELLED_RELEASED', 'cancelled terminal state');
     assert(request.expected_revision === s.revision, 'revision conflict');
     const d = request.data ?? {};
+    if (s.version === 3 && s.shipping.intent && !['record-merge', 'record-deployment', 'release'].includes(request.action)) throw Error('shipping outcome must be reconciled; lock retained');
     if (Date.now() >= s.deadline && !['request-stop','confirm-quiescent','revoke-actor','cancel-release','release','command-exit','record-merge','record-deployment'].includes(request.action)) {
       s.phase = 'STOPPING'; s.revision++; await atomic(join(p.lock, 'state.json'), s); throw Error('deadline reached; lock retained');
     }
@@ -166,7 +171,6 @@ export async function transition(cwd, request, internal = null) {
       await atomic(join(p.lock, 'state.json'), s); throw Error('head changed; evidence invalidated');
     }
     const needCoordinator = () => assert(coordinator, 'coordinator required');
-    if (s.version === 3 && s.shipping.intent && !['record-merge', 'record-deployment', 'release'].includes(request.action)) throw Error('shipping outcome must be reconciled; lock retained');
     switch (request.action) {
       case 'dispatch-intent':
         needCoordinator(); assert((d.role === 'writer' && s.phase === 'ACTIVE' && (s.version !== 3 || s.work.allowPublish === true) || d.role === 'reviewer' && s.phase === 'SEALED') && !s.actors.some(a => !a.stopped), 'invalid dispatch or active actor');
