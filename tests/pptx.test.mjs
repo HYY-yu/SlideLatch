@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import JSZip from 'jszip';
 import { readSourceSlides, writePptx, NS } from '../lib/pptx/xml.ts';
@@ -13,6 +15,14 @@ globalThis.XMLSerializer=XMLSerializer;
 const original=readFileSync(new URL('../public/demo/minimal-business/minimal-business-original.pptx',import.meta.url));
 const slides=await readSourceSlides(original);
 
+function writeTestPptx(t,name,bytes){
+ const directory=mkdtempSync(join(tmpdir(),'slidelatch-pptx-'));
+ t.after(()=>rmSync(directory,{recursive:true,force:true}));
+ const artifact=join(directory,name);
+ writeFileSync(artifact,bytes);
+ assert.deepEqual(readFileSync(artifact),Buffer.from(bytes));
+}
+
 test('all 33 slides and all 279 marked components retain their original OOXML identity',()=>{
  assert.equal(slides.length,33);
  const marked=slides.flatMap(slide=>slide.nodes).filter(node=>node.marked&&node.kind!=='grpSp');
@@ -21,7 +31,7 @@ test('all 33 slides and all 279 marked components retain their original OOXML id
  assert.ok(slides[2].nodes.some(n=>n.kind==='grpSp'&&n.name==='@1@1[3-5]'));
 });
 
-test('patches round-trip names, sizes and group-local positions while retaining every untouched ZIP part',async()=>{
+test('patches round-trip names, sizes and group-local positions while retaining every untouched ZIP part',async t=>{
  const title=slides[0].nodes.find(n=>n.id==='3');
  const group=slides[2].nodes.find(n=>n.name==='@1@1[3-5]');
  const child=slides[2].nodes.find(n=>n.parentId===group.id&&n.name.startsWith('@文本'));
@@ -56,7 +66,7 @@ test('patches round-trip names, sizes and group-local positions while retaining 
   const texts=doc=>Array.from(doc.getElementsByTagNameNS(NS.a,'t')).map(n=>n.textContent);
   assert.deepEqual(texts(left),texts(right));
  }
- writeFileSync('/private/tmp/slidelatch-roundtrip.pptx',result);
+ writeTestPptx(t,'slidelatch-roundtrip.pptx',result);
 });
 
 test('invalid patches fail explicitly instead of corrupting the package',async()=>{
@@ -238,7 +248,7 @@ test('list item headings replace root group rows and tolerate prefixed content n
  assert.equal(child.name,item.nodes.find(n=>n.key===child.key).name);
 });
 
-test('flat list members become native groups and can be added or released without deleting shapes',async()=>{
+test('flat list members become native groups and can be added or released without deleting shapes',async t=>{
  const {editListMembers,groupedModel}=await import('../lib/pptx/grouping.ts');
  const {slideLists}=await import('../lib/pptx/lists.ts');
  const renderNodes=(nodes,parent=null)=>nodes.filter(n=>n.parentId===parent).map(n=>({id:n.id,type:n.kind==='grpSp'?'group':'text',left:n.box?.x??0,top:n.box?.y??0,width:n.box?.width??1,height:n.box?.height??1,elements:n.kind==='grpSp'?renderNodes(nodes,n.id):undefined}));
@@ -262,7 +272,7 @@ test('flat list members become native groups and can be added or released withou
  assert.equal(reread[3].nodes.find(n=>n.id===decoration.id).parentId,null);
  assert.equal(reread[3].nodes.length,actual[3].nodes.length);
  assert.equal(slides[3].nodes.find(n=>n.id===decoration.id).parentId,null);
- writeFileSync('/private/tmp/slidelatch-native-groups.pptx',bytes);
+ writeTestPptx(t,'slidelatch-native-groups.pptx',bytes);
 });
 
 test('editing an existing native group releases members in place and preserves untouched package parts',async()=>{

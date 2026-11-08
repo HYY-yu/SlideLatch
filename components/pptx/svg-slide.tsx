@@ -23,11 +23,11 @@ function PaintDefs({paint,id,width,height}:{paint?:Paint;id:string;width:number;
 }
 const paintValue=(paint:Paint|undefined,id:string):string=>!paint?'none':paint.type==='color'?String(paint.value||'none'):paint.type==='image'||paint.type==='gradient'?`url(#${id})`:String((paint.value as {backgroundColor?:string})?.backgroundColor||'#e8ecea');
 
-function RichText({html,width,height,element,preview}:{html:string;width:number;height:number;element:RenderElement;preview?:string}) {
+function RichText({html,width,height,element,preview,workflowKey,workflowScope}:{html:string;width:number;height:number;element:RenderElement;preview?:string;workflowKey?:string;workflowScope?:'page-text'|'unsupported'}) {
   const inset=element.textInset||{};
   const content=useMemo(()=>safeRichText(html,element.autoFit?.fontScale||1,preview),[html,element.autoFit?.fontScale,preview]);
   const align=element.vAlign==='mid'?'center':element.vAlign==='down'?'flex-end':'flex-start';
-  return <foreignObject width={Math.max(1,width)} height={Math.max(1,height)} style={{pointerEvents:'none',overflow:'hidden'}}><div className="pptx-rich-text" style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',justifyContent:align,boxSizing:'border-box',padding:`${inset.t||0}px ${inset.r||0}px ${inset.b||0}px ${inset.l||0}px`,fontSize:18,lineHeight:1.1,overflow:'hidden',color:'#202832',whiteSpace:'normal',overflowWrap:'break-word'}}><div dangerouslySetInnerHTML={{__html:content}}/></div></foreignObject>;
+  return <foreignObject data-workflow-node-key={workflowKey} data-workflow-scope={workflowScope} width={Math.max(1,width)} height={Math.max(1,height)} style={{pointerEvents:'none',overflow:'hidden'}}><div data-workflow-text-box="" className="pptx-rich-text" style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',justifyContent:align,boxSizing:'border-box',padding:`${inset.t||0}px ${inset.r||0}px ${inset.b||0}px ${inset.l||0}px`,fontSize:18,lineHeight:1.1,overflow:'hidden',color:'#202832',whiteSpace:'normal',overflowWrap:'break-word'}}><div data-workflow-text-content="" dangerouslySetInnerHTML={{__html:content}}/></div></foreignObject>;
 }
 function TableView({element,width,height}:{element:RenderElement;width:number;height:number}) {
   const rows=element.data as {text:string;fillColor?:string;rowSpan?:number;colSpan?:number;hMerge?:number;vMerge?:number;borders?:Record<string,{borderColor:string;borderWidth:number}>}[][];
@@ -69,7 +69,10 @@ export default function SvgSlide({model,slideIndex,patches,selected,selectedMemb
   const slide=model.deck.slides[slideIndex],source=model.slides[slideIndex];
   const registry=new Map(source.nodes.map(node=>[node.id,node]));
   const {width,height}=model.deck.size;
-  const lists=interactive?slideLists(source.nodes,patches):[];
+  const sourceLists=slideLists(source.nodes,patches);
+  const childIds=new Set(source.nodes.flatMap(node=>node.children));
+  const listNodeKeys=new Set(sourceLists.flatMap(list=>list.items.flatMap(item=>item.nodes.map(n=>n.key))));
+  const lists=interactive?sourceLists:[];
   const hidden=new Set(lists.flatMap(list=>list.items.slice(listPreviewCount(list,listPreviews)).flatMap(item=>item.nodes.map(n=>n.key))));
   function renderElement(element:RenderElement,index:number,layout=false,instance=''):ReactNode {
     const node=!layout?registry.get(String(element.id)):undefined;
@@ -102,9 +105,9 @@ export default function SvgSlide({model,slideIndex,patches,selected,selectedMemb
       else if(element.shapType==='ellipse')geometry=<ellipse cx={b.width/2} cy={b.height/2} rx={b.width/2} ry={b.height/2} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
       else if(element.shapType==='line'||b.height===0)geometry=<path d={`M0 0L${b.width} ${b.height}`} fill="none" stroke={stroke} strokeWidth={strokeWidth}/>;
       else geometry=<rect width={b.width} height={b.height} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
-      body=<><defs><PaintDefs paint={element.fill} id={pid} width={b.width} height={b.height}/></defs>{geometry}{element.content&&b.height>0&&!image&&<RichText html={element.content} width={b.width} height={b.height} element={element} preview={node?textPreviews[node.key]:undefined}/>}</>;
+      body=<><defs><PaintDefs paint={element.fill} id={pid} width={b.width} height={b.height}/></defs>{geometry}{element.content&&b.height>0&&!image&&<RichText html={element.content} width={b.width} height={b.height} element={element} preview={node?textPreviews[node.key]:undefined} workflowKey={!instance?node?.key:undefined} workflowScope={node&&node.kind==='sp'&&!childIds.has(node.id)&&!layout&&!instance&&!node.parentId&&!listNodeKeys.has(node.key)&&!node.rotation&&!element.rotate&&!node.flipH&&!node.flipV&&!element.isFlipH&&!element.isFlipV&&!node.dataKind&&!node.hasImage?'page-text':'unsupported'}/>}</>;
     }else body=<g><rect width={b.width} height={b.height} fill="#f0ede8" stroke="#c5b999"/><text x="5" y="16" fontSize="10" fill="#756c58">{element.type}</text></g>;
-    return <g key={key} id={node?`${prefix}-${instance}node-${node.id}`:undefined} transform={matrixString(m)} data-shape-id={node?.id}>
+    return <g key={key} id={node?`${prefix}-${instance}node-${node.id}`:undefined} transform={matrixString(m)} data-shape-id={node?.id} data-workflow-node-key={!instance?node?.key:undefined}>
       {body}
       {interactive&&!instance&&node&&node.kind!=='grpSp'&&<rect data-hit-key={node.key} x={-1} y={-1} width={Math.max(3,b.width+2)} height={Math.max(3,b.height+2)} fill="transparent" stroke={(patches[node.key]?.name??node.name).trim().startsWith('@')?'#7768e640':'transparent'} strokeWidth=".6" vectorEffect="non-scaling-stroke" style={{cursor:'move'}} onPointerDown={event=>{event.stopPropagation();onSelect?.(node.key);onDrag?.(event,node,'move')}}/>}
     </g>;

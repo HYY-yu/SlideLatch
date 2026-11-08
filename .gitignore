@@ -9,3 +9,9 @@ out/
 
 # Local recovery archives
 backups/
+
+# Package-local dependency directories or development symlinks
+**/node_modules
+
+# Isolated local QA build cache
+.next-slidelatch-qa/

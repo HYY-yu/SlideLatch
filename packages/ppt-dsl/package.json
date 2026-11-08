@@ -1,0 +1,41 @@
+{
+  "name": "ppt-node-dsl-generator",
+  "version": "0.1.0",
+  "description": "\u7f16\u8bd1 PowerPoint \u9009\u62e9\u7a97\u683c\u8282\u70b9 DSL \u6a21\u677f\u5e76\u751f\u6210\u53d7\u7ea6\u675f\u7684\u6f14\u793a\u6587\u7a3f\u3002",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HYY-yu/ppt-dsl-generator.git"
+  },
+  "keywords": [
+    "powerpoint",
+    "pptx",
+    "dsl",
+    "codex-skill"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "compile-template": "node --import tsx src/compile-template.ts",
+    "validate-input": "node --import tsx src/validate-input.ts",
+    "generate": "node --import tsx src/generate-deck.ts",
+    "verify": "node --import tsx src/verify-deck.ts",
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "select-template": "node --import tsx src/select-template.ts"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "fast-xml-parser": "5.10.1",
+    "jszip": "^3.10.1",
+    "pptx-automizer": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
