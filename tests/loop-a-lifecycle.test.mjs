@@ -366,7 +366,7 @@ test('legacy cancellation requires separately bound independent audit', () => fi
   const result = await transition(cwd, { ...request, data: { ...request.data, audit } });
   assert.equal(result.phase, 'CANCELLED_RELEASED');
   const archived = JSON.parse(await readFile(join(root, '.git', 'loop-a', `cancelled-${cap.epoch}`, 'state.json'), 'utf8'));
-  assert.equal(archived.cancellation.validation, 'independent-human-audit');
+  assert.equal(archived.cancellation.validation, 'independent-reviewer-audit');
 }));
 
 test('worker binding returns no token and reserves an external opaque file', () => fixture(async cwd => {

@@ -227,7 +227,7 @@ export async function transition(cwd, request, internal = null) {
         else assert(d.mode === 'supervisor-evidence', 'explicit supervisor evidence mode required');
         assert(await git(p.cwd, 'rev-parse', 'HEAD') === observedHead && !(await git(p.cwd, 'status', '--porcelain')), 'cancellation head changed');
         if (legacy) { s.version = 2; s.commands.forEach(c => { c.result = null; }); }
-        s.cancellation = { mode: d.mode, validation: legacy ? 'independent-human-audit' : 'supervisor-records-with-host-stop-attestation', binding, reason: d.reason, codeVersion: d.codeVersion, implementationHash: digest(await readFile(fileURLToPath(import.meta.url), 'utf8')), audit: legacy ? d.audit : null, at: Date.now() };
+        s.cancellation = { mode: d.mode, validation: legacy ? 'independent-reviewer-audit' : 'supervisor-records-with-host-stop-attestation', binding, reason: d.reason, codeVersion: d.codeVersion, implementationHash: digest(await readFile(fileURLToPath(import.meta.url), 'utf8')), audit: legacy ? d.audit : null, at: Date.now() };
         s.phase = 'CANCELLED_RELEASED';
         break;
       }
