@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -257,3 +257,42 @@ test('leader exit with living descendant is uncertain and cannot release', () =>
   await new Promise(resolve => setTimeout(resolve, 2600)); // Fixture descendant self-exits; no reused PID is signalled.
   await assert.rejects(setup(cwd), /EEXIST/);
 }));
+
+test('coordinator revokes stopped capability before replay authentication', () => fixture(async cwd => {
+  const cap = await setup(cwd);
+  const writer = await bind(cwd, cap, 'writer', 'writer');
+  const request = { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: 'written', action: 'write', data: { path: 'file', content: 'base' } };
+  await transition(cwd, request);
+  await assert.rejects(call(cwd, cap, 'revoke-actor', { actor: 'writer', reason: 'fixture' }), /quiescent/);
+  await call(cwd, cap, 'request-stop');
+  await call(cwd, cap, 'confirm-quiescent', { observations: [{ id: 'writer', status: 'stop-acknowledged', noExternalProcesses: true, source: 'synthetic fixture', observedAt: Date.now() }] });
+  await assert.rejects(call(cwd, writer, 'revoke-actor', { actor: 'writer', reason: 'fixture' }), /coordinator/);
+  await call(cwd, cap, 'revoke-actor', { actor: 'writer', reason: 'fixture' }, 'revoked');
+  await assert.rejects(transition(cwd, request), /invalid capability/);
+  await assert.rejects(call(cwd, writer, 'write', { path: 'file', content: 'forbidden' }), /invalid capability/);
+  assert.deepEqual((await inspect(cwd)).authors, ['writer']);
+  assert.equal((await inspect(cwd)).actors[0].id, 'writer');
+}));
+
+for (const defect of ['missing-command-proof', 'pending', 'uncertain', 'late-command', 'unknown-actor', 'mutation']) {
+  test(`revocation retains lock with ${defect}`, () => fixture(async (cwd, root) => {
+    const cap = await setup(cwd);
+    const writer = await bind(cwd, cap, 'writer', 'writer');
+    const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+    await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: 'verified', data: { label: 'verify' } });
+    await call(cwd, cap, 'request-stop');
+    await call(cwd, cap, 'confirm-quiescent', { observations: [{ id: 'writer', status: 'stop-acknowledged', noExternalProcesses: true, source: 'synthetic fixture', observedAt: Date.now() }] });
+    const path = join(root, '.git', 'loop-a', 'lock', 'state.json');
+    const state = JSON.parse(await readFile(path, 'utf8'));
+    if (defect === 'missing-command-proof') state.stopEvidence.commandIds = [];
+    if (defect === 'pending') state.commands[0].status = 'PENDING';
+    if (defect === 'uncertain') state.commands[0].status = 'UNCERTAIN';
+    if (defect === 'late-command') state.stopEvidence.observations[0].observedAt = state.commands[0].exit.ended - 1;
+    if (defect === 'unknown-actor') state.actors.push({ intent: 'unknown', id: null, capability: null, role: 'reviewer', stopped: false, worktree: null, lastActivity: Date.now() });
+    if (defect === 'mutation') state.mutation = { operation: 'unknown', path: 'file', contentHash: '0'.repeat(64), status: 'PENDING' };
+    await writeFile(path, JSON.stringify(state));
+    await assert.rejects(call(cwd, cap, 'revoke-actor', { actor: 'writer', reason: 'fixture' }), /stop evidence|mutation/);
+    assert.equal(JSON.parse(await readFile(path, 'utf8')).actors[0].capability, state.actors[0].capability);
+    await assert.rejects(setup(cwd), /EEXIST/);
+  }));
+}

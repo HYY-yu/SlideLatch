@@ -102,7 +102,7 @@ export async function transition(cwd, request, internal = null) {
     if (prior) { assert(prior.payload === payload, 'operation payload conflict'); return prior.result; }
     assert(request.expected_revision === s.revision, 'revision conflict');
     const d = request.data ?? {};
-    if (Date.now() >= s.deadline && !['request-stop','confirm-quiescent','release','command-exit'].includes(request.action)) {
+    if (Date.now() >= s.deadline && !['request-stop','confirm-quiescent','revoke-actor','release','command-exit'].includes(request.action)) {
       s.phase = 'STOPPING'; s.revision++; await atomic(join(p.lock, 'state.json'), s); throw Error('deadline reached; lock retained');
     }
     if (['record-review','record-pr','record-ci','release'].includes(request.action) && await git(s.cwd, 'rev-parse', 'HEAD') !== s.head) {
@@ -158,6 +158,15 @@ export async function transition(cwd, request, internal = null) {
       case 'confirm-quiescent':
         needCoordinator(); assert(Array.isArray(d.observations) && d.observations.length === s.actors.length && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true) && s.actors.every(a => a.id && d.observations.some(o => o.id === a.id && o.status === 'stop-acknowledged' && o.noExternalProcesses === true && typeof o.source === 'string' && o.source.length > 0 && Number.isFinite(o.observedAt) && o.observedAt >= a.lastActivity && o.observedAt <= Date.now())), 'positive actor stop evidence required');
         s.actors.forEach(a => { a.stopped = true; }); s.stopEvidence = { observations: d.observations, commandIds: s.commands.map(c => c.id), at: Date.now() }; if (!['SEALED','REVIEWED','PR','CI'].includes(s.phase)) s.phase = 'QUIESCENT'; break;
+      case 'revoke-actor': {
+        needCoordinator();
+        const target = s.actors.find(a => a.id === d.actor);
+        const proof = s.stopEvidence;
+        assert(s.phase === 'QUIESCENT' && target?.stopped && proof && typeof d.reason === 'string' && d.reason.trim(), 'quiescent actor and revocation reason required');
+        assert(proof.observations.length === s.actors.length && new Set(proof.observations.map(o => o.id)).size === s.actors.length && proof.commandIds.length === s.commands.length && new Set(proof.commandIds).size === s.commands.length && s.actors.every(a => a.id && a.stopped && proof.observations.some(o => o.id === a.id && o.status === 'stop-acknowledged' && o.noExternalProcesses === true && o.observedAt >= a.lastActivity)) && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true && proof.commandIds.includes(c.id) && proof.at >= c.exit.ended && proof.observations.some(o => o.id === c.actor && o.observedAt >= c.exit.ended)), 'latest complete stop evidence required');
+        target.capability = null;
+        break;
+      }
       case 'seal-writer':
         needCoordinator(); assert(s.phase === 'QUIESCENT' && !(await git(cwd, 'status', '--porcelain')), 'clean quiescent worktree required');
         s.head = await git(cwd, 'rev-parse', 'HEAD'); s.phase = 'SEALED'; break;
@@ -174,6 +183,7 @@ export async function transition(cwd, request, internal = null) {
     }
     s.revision++;
     const result = { epoch: s.epoch, revision: s.revision, phase: s.phase };
+    if (request.action === 'revoke-actor') result.revocation = { actor: d.actor, reason: d.reason, at: Date.now(), operation: request.operation_id };
     s.operations[request.operation_id] = { payload, result };
     valid(s);
     await atomic(join(p.lock, 'state.json'), s);
