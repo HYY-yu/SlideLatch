@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, readFile, realpath, chmod } from 'node:fs/promises';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -169,9 +170,21 @@ test('deadline supervisor stops only its live process group and retains lease', 
 }));
 test('supervisor observes a delayed group exit without signalling after leader exit', t => fixture(async cwd => {
   const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
-  await writeFile(join(cwd, 'verify.cjs'), `process.on('SIGTERM', () => setTimeout(() => process.exit(0), 150)); setInterval(() => {}, 1000);`);
+  // npm may wait for its direct child before exiting. Keep an IPC-ready grandchild
+  // in the same group until the first real post-leader probe explicitly releases it.
+  await writeFile(join(cwd, 'tail.cjs'), `
+    const fs = require('node:fs');
+    process.on('exit', () => fs.writeFileSync('tail-exited', 'done'));
+    setTimeout(() => process.exit(2), 10000).unref();
+    setInterval(() => { if (fs.existsSync('tail-release')) process.exit(0); }, 10);
+    process.send('ready');
+  `);
+  await writeFile(join(cwd, 'verify.cjs'), `
+    const tail = require('node:child_process').spawn(process.execPath, ['tail.cjs'], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+    tail.once('message', () => { tail.disconnect(); tail.unref(); });
+  `);
   await writeFile(join(cwd, 'package.json'), JSON.stringify({ scripts: { verify: 'node verify.cjs' } }));
-  const cap = await acquire(cwd, { issue: 17, owner: 'fixture', authorization: 'fixture', paths: ['file'], timeoutMs: 1800 });
+  const cap = await setup(cwd);
   const writer = await bind(cwd, cap, 'writer', 'writer');
   const deadline = (await inspect(cwd)).deadline;
   const kill = process.kill.bind(process);
@@ -180,7 +193,10 @@ test('supervisor observes a delayed group exit without signalling after leader e
     if (observed) assert.equal(signal, 0, 'leader exit must end authority to send signals');
     if (signal === 0) observed = true;
     const result = kill(pid, signal);
-    if (signal === 0) observedExistingGroup = true;
+    if (signal === 0) {
+      observedExistingGroup = true;
+      writeFileSync(join(cwd, 'tail-release'), 'done');
+    }
     return result;
   });
   try {
@@ -192,8 +208,16 @@ test('supervisor observes a delayed group exit without signalling after leader e
     assert.equal(s.deadline, deadline);
     await assert.rejects(setup(cwd), /EEXIST/);
   } finally {
-    // Only this synthetic descendant self-exits; never signal a numeric PID after leader exit.
-    await new Promise(resolve => setTimeout(resolve, 250));
+    // Cleanup is also cooperative; never signal a numeric PID after leader exit.
+    writeFileSync(join(cwd, 'tail-release'), 'done');
+    const until = performance.now() + 2000;
+    let exited = false;
+    do {
+      try { await readFile(join(cwd, 'tail-exited')); exited = true; break; }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+      await new Promise(resolve => setTimeout(resolve, 10));
+    } while (performance.now() < until);
+    assert(exited, 'fixture descendant must acknowledge cooperative exit before cleanup');
   }
 }));
 
