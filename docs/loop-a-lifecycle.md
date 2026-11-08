@@ -51,7 +51,7 @@ coordinator 把对应 worker 的 `{epoch,token: capability}` 写到独立私有�
 
 测试使用临时 Git 仓库和真实子进程；产品 UI、PPT 导出及 PowerPoint 未变，不适用视觉/原生验收。完整验收仍要求 npm run verify 和非作者精确 SHA 审查。
 
-命令定义在 acquire 时记录实际 Node/npm/Git 路径及固定环境，清除调用者 NODE_OPTIONS、GIT_CONFIG 等注入变量；不继承任意 PATH。保持正常 hooks 与 npm scripts。git add 与 commit 在同一受管进程组中执行。启动前通过私有 command-start 事务重查取消、deadline 与 reviewer HEAD；如果 leader 退出但组仍存活，记录 UNCERTAIN 并持锁，不对可能复用的 PID 发信号。
+命令定义在 acquire 时记录实际 Node/npm/Git 路径及固定环境，清除调用者 NODE_OPTIONS、GIT_CONFIG 等注入变量；不继承任意 PATH。保持正常 hooks 与 npm scripts。git add 与 commit 在同一受管进程组中执行。启动前通过私有 command-start 事务重查取消、deadline 与 reviewer HEAD；leader 退出后，supervisor 仅用 signal 0 每 25ms 观察进程组，使用单调时钟限制为最多 1 秒的退出证据预算，不延长业务 deadline、不启动新业务。只有 ESRCH 证明组已不存在；预算耗尽后组仍存在（包括未回收 zombie），或遇到非 ESRCH 错误，均记录 UNCERTAIN 并持锁。观察期间不对可能复用的 PID 发送 TERM/KILL，也不以扫描或忽略 zombie 替代退出证明。
 
 依赖由 coordinator 在派发前按两个现有 lockfile 预置或核验一致后复用，并记录证据。writer/reviewer 不自行绕过入口安装依赖。reviewer 的 capability 文件仍绑定同一 epoch，但从 coordinator 绑定的独立 review worktree 调用 managed-command/record-review；coordinator 的操作仍在 writer worktree。
 

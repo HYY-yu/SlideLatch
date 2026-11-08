@@ -267,6 +267,21 @@ export async function transition(cwd, request, internal = null) {
 }
 
 // Foreground supervisor: only this live ChildProcess handle authorizes signals.
+// Leader exit can precede the last group member's exit/reaping. Observe only:
+// the dead ChildProcess no longer authorizes TERM/KILL against a numeric PGID.
+async function observeGroupExit(pid) {
+  if (!pid) return false;
+  const until = performance.now() + 1000;
+  do {
+    try { process.kill(-pid, 0); }
+    catch (error) { return error.code === 'ESRCH'; }
+    const remaining = until - performance.now();
+    if (remaining <= 0) break;
+    await new Promise(resolve => setTimeout(resolve, Math.min(25, remaining)));
+  } while (performance.now() < until);
+  return false; // Still present, including unreaped zombies: keep the lease.
+}
+
 // A crashed supervisor leaves PENDING evidence and the lease held indefinitely.
 export async function managedCommand(cwd, request) {
   const label = request.data?.label;
@@ -323,10 +338,7 @@ export async function managedCommand(cwd, request) {
   }, 100);
   const outcome = await completion;
   live = false; clearInterval(timer);
-  let groupGone = false;
-  if (child.pid) {
-    try { process.kill(-child.pid, 0); } catch (e) { groupGone = e.code === 'ESRCH'; }
-  }
+  const groupGone = await observeGroupExit(child.pid);
   const evidence = { ...outcome, pid: child.pid ?? -1, started: startedAt, ended: Date.now(), groupGone };
   const current = await inspect(cwd);
   return transition(cwd, { ...request, expected_revision: current.revision, operation_id: `${request.operation_id}:exit`, action: 'command-exit', data: { id: request.operation_id, nonce, evidence } }, { key: SUPERVISOR });
