@@ -59,5 +59,12 @@ test('invocation start is exclusive and preserves caller budget', async () => {
     const fallback = await beginInvocation(join(root, 'fallback'), { worktree: repo, invocationId: 'fallback' }, now);
     assert.equal(fallback.startedAt, now);
     assert.equal(fallback.timingSource, 'first-observable-entry');
+    await assert.rejects(beginInvocation(path, { worktree: repo, invocationId: 'output-failure', startedAt: now - 50 }, now), /EEXIST/);
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), first);
+    await assert.rejects(beginInvocation(join(root, 'failure-reset.json'), { worktree: repo, invocationId: 'output-failure', startedAt: now }, now), /cannot be reset/);
+    const recovered = await beginInvocation(join(root, 'failure-retry.json'), { worktree: repo, invocationId: 'output-failure' }, now + 25);
+    assert.equal(recovered.startedAt, now - 50);
+    assert.equal(recovered.recordedAt, now);
+
   } finally { await rm(root, { recursive: true, force: true }); }
 });
