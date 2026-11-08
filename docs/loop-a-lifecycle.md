@@ -1,10 +1,10 @@
-# 循环 A writer 生命周期（Issue #11）
+# 循环 A 生命周期
 
 这是本地合作协议，不是操作系统沙箱、后台调度器或 GitHub 权限控制。执行入口为 `scripts/loop-a-lifecycle.mjs`，不修改 phase1 inspection 接口；两者竞争同一个 git common-dir 下的 `loop-a/lock`。本轮顺序明确改为 **本地非作者验收后才创建 Draft PR**，覆盖 team-workflow 中旧的先 Draft 后验收顺序。
 
 ## 数据与失败边界
 
-租约保存 Issue、授权来源、owner、canonical 独立 worktree、branch、base/head、随机 epoch、CAS revision、批准写路径、真实 native actor ID、历史作者集合、20 分钟以内 deadline、修复预算和证据。coordinator 的能力与 worker 能力不同，只保存哈希。能力文件应放仓库外、权限 0600，不发到 PR、日志或聊天。不能将同一个全权能力交给 writer/reviewer。
+租约保存可选 Issue、用户目标、授权来源、coordinator 生成的 scope 来源、owner、canonical 独立 worktree、branch、base/head、随机 epoch、CAS revision、批准写路径、真实 native actor ID、历史作者集合、20 分钟以内 deadline、修复预算和证据。coordinator 的能力与 worker 能力不同，只保存哈希。能力文件应放仓库外、权限 0600，不发到 PR、日志或聊天。不能将同一个全权能力交给 writer/reviewer。
 
 原子 mkdir 取得共享租约；短事务 mkdir 序列化状态变更，临时文件 rename 提交状态。未知 schema、创建中锁、崩溃事务和缺失退出证据均失败关闭。没有 TTL 抢锁/删锁功能。磁盘或进程崩溃可能留下锁，需要人工调查，不能凭 PID、时间或 native completed/interrupt 状态恢复。
 
@@ -22,6 +22,8 @@ acquire 输入：`{"issue":11,"authorization":"授权来源的准确引用","own
 
 每个后续 request 含 `operation_id`（唯一稳定字符串）、`expected_revision`（inspect 得到的整数）、`data`（下表）。capability 文件含 epoch/token；命令行 action 决定操作类型。不要把请求文件写入 pilot 工作区，否则会影响干净门禁。
 
+下表保留 schema 1/2 writer 契约。schema 3 的已有 PR、合并和部署差异见下方 PR-first 小节。
+
 | ACTION | data | 调用者及结果 |
 | --- | --- | --- |
 | dispatch-intent | role: writer 或 reviewer | coordinator；writer 仅 ACTIVE，reviewer 仅 SEALED；不得有活跃 actor |
@@ -37,11 +39,11 @@ acquire 输入：`{"issue":11,"authorization":"授权来源的准确引用","own
 | repair | evidence | coordinator；所有 actor 停止后重新进入 ACTIVE，最多两次；相同证据第二次暂停 |
 | release | 空对象 | coordinator；CI 或取消后的 QUIESCENT，所有 actor 与命令已停止、当前 HEAD 未变化；归档租约并释放共享锁 |
 
-coordinator 把对应 worker 的 `{epoch,token: capability}` 写到独立私有能力文件，只交给该 worker。native spawn 未知时保留未绑定 intent 和锁，不再派第二名 writer。reviewer 完成后也必须收集停止确认；confirm-quiescent 在验收阶段保留该阶段，不破坏 CI 门禁。
+coordinator 使用 bind-worker 生成独立私有能力文件，只交给 worker 不透明路径。不得自行读取或拼接能力内容。native spawn 未知时保留未绑定 intent 和锁，不再派第二名 writer。reviewer 完成后也必须收集停止确认；confirm-quiescent 在验收阶段保留该阶段，不破坏 CI 门禁。
 
 ## 实际 pilot
 
-冻结后的实现入口来自本实现提交，pilot 不能改入口、测试或 package scripts。pilot 在另一个独立 worktree/branch，仅批准 `.codex/agents/integration-manager.toml`。按 acquire → dispatch/bind writer → write → managed commit → managed verify（新 HEAD） → actor 停写确认 → quiescent → seal → dispatch/bind 独立 reviewer → 精确 SHA 验收 → review → Draft PR → CI → reviewer 停止确认 → release 执行。coordinator 必须在发布/交付时再次查询远端 PR HEAD 与实际 CI；本地记录不是远端真实性证明。不得合并、部署或启动后台调度。
+冻结后的实现入口来自本实现提交，pilot 不能改入口、测试或 package scripts。pilot 在另一个独立 worktree/branch，仅批准 `.codex/agents/integration-manager.toml`。按 acquire → dispatch/bind writer → write → managed commit → managed verify（新 HEAD） → actor 停写确认 → quiescent → seal → dispatch/bind 独立 reviewer → 精确 SHA 验收 → review → Draft PR → CI → reviewer 停止确认 → release 执行。coordinator 必须在发布/交付时再次查询远端 PR HEAD 与实际 CI；本地记录不是远端真实性证明。这段描述历史 writer pilot，不是当前 PR-first 策略。当前合并和生产结果按下文 schema 3 门禁处理；不启动后台调度。
 
 ## 信任边界与验收
 
@@ -61,7 +63,7 @@ writer 的 managed commit 允许合法推进 Git HEAD；租约 head 在 seal-wri
 
 ## Cancellation recovery
 
-New acquisitions use schema 2. The foreground supervisor records successful command results inside its exit transaction: epoch, actor, operation, capture time, HEAD, tree, parents and changed paths. These are Git observations by the supervisor, not worker declarations. Schema 1 remains readable but is never upgraded into mechanical commit evidence from a verify record.
+Legacy inputs acquire schema 2. PR-first version 2 inputs acquire schema 3. The foreground supervisor records successful command results inside its exit transaction: epoch, actor, operation, capture time, HEAD, tree, parents and changed paths. These are Git observations by the supervisor, not worker declarations. Schema 1 remains readable but is never upgraded into mechanical commit evidence from a verify record.
 
 The coordinator may `revoke-actor` only after complete, current stop evidence. The actor capability becomes null while identity, authorship and a revocation audit result remain. Old schema-1 helpers reject the revoked token before operation replay. Deadline expiry permits this cleanup but not new work.
 
@@ -70,3 +72,24 @@ The coordinator may `revoke-actor` only after complete, current stop evidence. T
 Cancellation preserves the original lease head and records observedHead separately. Its only terminal state is CANCELLED_RELEASED, never successful RELEASED. The success helper rejects it. The transaction persists cancellation and its operation before renaming the entire lock to cancelled-EPOCH. Failed rename retains the lock. Identical authenticated retries finish archival before reporting success; archived retries address only that epoch and cannot modify a successor lease. Unknown transactions remain blocked rather than being removed automatically.
 
 CLI `bind-worker` takes coordinator capability as its opaque third argument and a data.capabilityOutput path outside the repository. It generates the worker token internally, writes a new 0600 file and binds it without returning the token. Hand only that path to the worker. Neither coordinator nor worker should cat, open, read, echo, combine-read or forward capability contents. This cooperative contract is not an OS sandbox and does not revoke historical log copies by rotating values.
+
+## PR-first schema 3
+
+The same lease, supervisor, CAS revisions, opaque capabilities and cancellation protocol apply. Schema 3 adds work and shipping. Existing schema 1/2 archives remain readable without converting cancellation into success.
+
+work records kind, key, goal, authorizationSource, scopeSource, target and mergeAuthorization. Prepare adds allowPublish from the explicit publication grant. Implementation begins ACTIVE. Existing PR begins SEALED at target.head, with historical native authors already in authors. The initial local base is still this checkout SHA; target.base is the separate PR target SHA.
+
+The unchanged existing-PR route dispatches only an independent reviewer, with real managed verify and stop evidence. It does not dispatch a writer or invent a commit. A repair requires allowPublish, stopped actors and commands, concrete evidence and the existing two-repair budget. It returns to ACTIVE and must complete managed commit/verify and independent review again. Review base drift requires cancellation and a fresh round; never rewrite the frozen target.
+
+Schema 3 record-review adds base. record-pr adds number, base, baseRef, headRef, source and observedAt, and accepts either draft state for an existing PR. A new PR is initially Draft. record-ci adds base, source and observedAt. Each stage binds head and target base. Fresh observations are at most 60 seconds old. The host authenticates sources; the helper cannot query GitHub or authenticate JSON by itself.
+
+Additional actions use the same coordinator capability and transaction history.
+
+- merge-intent requires CI, full stop evidence and mergeAuthorization. Its data contains current PR identity, head/base/ref names, open state, draft false, mergeable true, unresolved 0, reviewDecision, complete check inventory, applicable requiredChecks, exact run and ciMergeSha, source/time and head/base-bound acceptance. Project-required checks must be nonempty even when GitHub branch protection is not configured. It stores expected_head_sha, ordinary merge method, time and the snapshot, then enters MERGING.
+- record-merge records a fresh official outcome merged, denied or not-merged. It requires matching head/base/URL. A merged result includes actual SHA and two parents in base, head order. MERGING blocks all unrelated actions. Unknown results cannot be recorded as non-merge; first query the authoritative PR and commit. Known denial cannot be retried in this lease and remains MERGE_BLOCKED at completion.
+- record-deployment requires a confirmed merge, production environment and the actual merged SHA. It records provider, ID, URL, status and source/time. Success also requires successful build and actual live regression bound to that SHA. Preview, skipped, missing and stale results do not pass.
+- release requires CI, MERGED or DEPLOYED, current local head and complete real stop/process evidence. A confirmed merge can release as DEPLOYMENT_PENDING or DEPLOYMENT_FAILED. An unknown merge cannot release. RELEASED means the local lease ended, not that production succeeded.
+
+Business actions stop at the original deadline. Outcome reconciliation and safe cleanup do not restart business or renew the lease. A new coordinator must not borrow the former owner's capability. After an actual release, observe-deployment is a read-only consistency check over that archive and new official observations with the new observer's identity. It does not touch a successor lease. Preserve the original epoch, plan and deadline in the continuation.
+
+GitHub's expected_head_sha checks head, not base atomically. Re-read both immediately before the external call and inspect actual merge parents afterward. A raced base remains a blocker rather than receiving stale acceptance. A result from a denied or uncertain call is never inferred from a local helper transition.

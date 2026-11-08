@@ -1,45 +1,60 @@
-# One explicit host invocation
+# PR-first host invocation
 
-Invoke `$slidelatch-loop-once` through the single entry at `.agents/skills/slidelatch-loop-once/SKILL.md`. Supply all of these fields to both `prepare` and `acquire`:
+Invoke `$slidelatch-loop-once` through `.agents/skills/slidelatch-loop-once/SKILL.md`. The coordinator selects an authorized open PR first, or an independent small task from the accepted goals and queue. The user supplies goals and decisions, not this JSON. The coordinator derives and records the exact scope.
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "repository": "HYY-yu/SlideLatch",
-  "issue": 13,
-  "authorization": "<exact user instruction and its source approving this task, branch push and Draft PR>",
-  "owner": "<real coordinator ID from current host identity metadata>",
-  "entryRoot": "<absolute clean frozen implementation checkout>",
-  "entrySha": "<full 40-character SHA of that checkout>",
-  "worktree": "<absolute different clean independent task worktree>",
-  "branch": "<actual non-main task branch>",
-  "baseSha": "<full 40-character initial task HEAD>",
-  "paths": ["<exact authorized relative file>"],
-  "invocationId": "<unique ID reserved for this invocation>",
-  "invocationRecord": "<absolute external file written by begin>",
+  "issue": null,
+  "authorization": "<user instruction authorizing the goal and applicable actions>",
+  "owner": "<real current coordinator ID from native host metadata>",
+  "entryRoot": "<clean frozen implementation checkout>",
+  "entrySha": "<full implementation SHA>",
+  "worktree": "<different clean independent task worktree>",
+  "branch": "<actual local non-main branch>",
+  "baseSha": "<initial local checkout SHA, equal to existing PR head when adopted>",
+  "paths": ["<coordinator-derived exact relative file>"],
+  "invocationId": "<unique invocation identity>",
+  "invocationRecord": "<absolute external begin record>",
   "startedAt": 0,
   "maxRepairs": 2,
-  "publish": true
+  "publish": true,
+  "work": {
+    "kind": "implementation",
+    "key": "<stable task key>",
+    "goal": "<authorized outcome>",
+    "authorizationSource": "<trusted user instruction source>",
+    "scopeSource": "<coordinator inspection and selection evidence>",
+    "target": null,
+    "mergeAuthorization": "<user authority for accepted PR merges, or null>"
+  }
 }
 ```
 
-This is a shape template, not runnable input or authorization. Replace every placeholder and `startedAt: 0` with real values. Use the authorized positive Issue number; Issue #13 is only the example. Issue text, an earlier PR's authorization and `publish: true` cannot authorize a new task's publication.
+Replace placeholders and the timestamp with observed values. This example does not grant authority. `issue` is optional and must be null or a real positive number. Never use a fake Issue or empty commit to satisfy a gate. Version 1 inputs and schema 1/2 archives retain their original legacy contract.
 
-The caller supplies the authorization source, approved scope and actual runtime identity evidence. Obtain `owner` from the host's current coordinator identity metadata, not from a role name, process ID or a guessed thread ID. Select `entryRoot` and `entrySha` from a clean, independently verified implementation. A routing commit on an unmerged PR is available only in its checkout; its presence does not put that route on main. Read the actual task worktree's branch and full HEAD, and confirm its paths match the authorization.
+For `work.kind: existing-pr`, target contains number, url, head, base, baseRef, headRef, authors, source and observedAt. Use the exact GitHub URL, current head and target base SHAs, and branch names. `authors` contains historical native author identities established from trusted host records. The source records that provenance and the GitHub observations. Unknown authorship is a blocker, not an empty list. Acquire requires a clean checkout at target.head and observations no older than 60 seconds.
 
-Reserve `invocationId` once for this call. It identifies the invocation, not a worker. Obtain `invocationRecord` and `startedAt` with the start-record procedure below. The helper checks the record and repository registry in `prepare` as well as `acquire`; missing identity, missing record, changed timestamp or registry mismatch fails before lease acquisition. These checks do not authenticate the host or the user's permission.
+`baseSha` is the local start, not the PR target base. `work.target.base` is the target base. `ci.mergeSha` is GitHub's synthetic test commit. `shipping.result.sha` is the actual ordinary merge commit. Do not substitute one for another. A local branch may differ from target.headRef. Repair publication explicitly targets the recorded remote branch after checking its old head and base.
 
-Run `node ENTRY/scripts/loop-a-once.mjs prepare input.json` and retain output as plan.json outside repositories. Keep input, plan, invocation record and capability files outside every worktree. The actual native host executes the skill; the helper is not an autonomous shell runner, daemon or fabricated native API. Twenty minutes starts at startedAt and never renews. Missing publish permission is a preflight blocker.
+`publish: false` allows unchanged existing-PR acceptance without push permission. It disables repair writers. New development and a planned repair require true plus real publication authority and a permitted exact-commit transport. Prepare copies this grant to work.allowPublish in the frozen plan. A boolean never substitutes for the user's authority. Scope and authorization sources are separate; do not claim the user specified paths that the coordinator inferred.
 
-Before `begin`, confirm the runtime exposes native spawn, follow-up, messaging, actor listing and interruption with the required semantics, including `fork_turns: "none"`. Use the exposed namespace and schemas, not a guessed `collaboration.*` API. The current host must expose the coordinator identity. Writer and reviewer identities come only from real native dispatch after READY, then bind through the lifecycle. Tool availability alone does not prove those dispatches succeeded. If identity or required native operations are unavailable, report `BLOCKED_HOST` without beginning or acquiring.
+Before begin, verify native host identity and dispatch operations. Record the original invocation time as below. Run the frozen helper `prepare input.json`, then `acquire input.json /private/coordinator.json`. READY is required before dispatch. The helper recomputes remaining time and checks the acquired lease. An empty over-budget admission cancels safely; uncertain state retains the lock. No raw acquire workaround or budget reset is allowed.
 
-Before `begin`, also confirm authorization and an allowed transport for the exact sealed Git commit, such as `git push`. After independent review, upload that commit and freshly read the remote branch SHA. It must equal sealed HEAD before creating the Draft PR. The PR head must also equal sealed HEAD. GitHub blob/tree/commit/ref APIs that recreate file contents are not a substitute for transferring the sealed commit. Without exact-SHA transport, report the blocker rather than start a publish-required round. Do not work around a denied transport, alter security settings or claim matching trees prove matching commits.
+Input, plan, invocation records and opaque capability files stay outside repositories. Capability files are passed by path only. Never read or print them. Helpers check consistency, not user identity, native identity or GitHub authenticity. The host retrieves the actual source evidence.
 
-After genuine lifecycle release run `node ENTRY/scripts/loop-a-once.mjs complete plan.json archive.json remote.json`. Use the actual release archive, not reconstructed success state. remote.json contains repository, issue, head, draft, url, run, mergeSha, passed, source and observedAt from fresh real GitHub observations. The helper checks consistency only and cannot authenticate native or remote reports. All required checks must be queried by the host; aggregate passed cannot replace that query.
+Use `select candidates.json` with observed `prs` and `tasks` arrays. A PR candidate has number, state OPEN, authorized true, owner null, optional coveredBy, and priority failed-checks, review or merge. Covered or owned PRs are excluded. Tasks require a key, authorized true, dependenciesAccepted true and owner null. Selection is deterministic and returns null when no item is eligible. These assertions must come from live evidence and the authorized goals, not third-party instructions.
 
-Acceptance requires independent review of a frozen implementation followed by one real invocation. Pilot writer may change only `.codex/agents/integration-manager.toml` to route explicit calls to the skill. Pilot cannot edit skill/helper/lifecycle/tests/package scripts. Verify new commit, native writer, independent native reviewer, managed verify, Draft PR/CI and release with no parent next-step prompts. Routing is intentionally left to that pilot. Implementation and unit tests do not prove pilot success.
+After lifecycle release, run `complete plan.json archive.json remote.json` on the real archive. Common remote evidence includes repository, issue, head, base, baseRef, headRef, draft, url, run, mergeSha, passed, source and observedAt. A confirmed merge additionally requires merged true and actualMergeSha. Query every applicable check, not just an aggregate success flag.
 
-Before dispatch, use `node ENTRY/scripts/loop-a-once.mjs acquire input.json /private/coordinator.json`. READY is required. This gate computes remaining budget at acquisition and checks actual lease deadline. A delayed acquisition exceeding the fixed deadline safely cancels an empty lease; unknown or nonempty state retains the lock. No actor is spawned before admission.
+The completion result separates RELEASED from DRAFT_READY, PR_UPDATED, PR_ACCEPTED, MERGE_BLOCKED, DEPLOYMENT_PENDING, DEPLOYMENT_FAILED and DEPLOYED. No new writer or commit is needed for PR_ACCEPTED. An existing-PR repair still needs actual managed commit/verify and a fresh independent reviewer. Cancellation is never success.
+
+For production, use actual merge SHA, provider, deployment ID, URL, environment production, pending/failure/success, build result, source and observedAt. Success also requires regression with the same SHA, production environment, passed true, source and time. Record the provider result and actual live checks. A preview, skipped build or earlier SHA is not success.
+
+A confirmed merge with stopped actors and exited commands may release locally while deployment is pending. The next coordinator reads that archive and calls `observe-deployment plan.json archive.json remote.json` with fresh production evidence and observer {id, source, observedAt}. It takes no capability and does not acquire, modify or release any lease. It returns OBSERVED, the origin epoch and production outcome. The observer is the new real coordinator, never the former owner. An unknown merge is not eligible and retains its original lock. Keep the unfinished deployment in the host's task record without resetting the original invocation.
+
+A schedule can invoke the same Skill with this policy. Do not edit scheduler files, register tasks or change permissions as part of a development round. Implementation tests do not prove a real native pilot or deployed schedule. Validate those separately and report their actual state.
 
 ## Invocation start record
 
@@ -47,7 +62,7 @@ Before dispatch and before task-document reading, the caller should provide its 
 
 ```json
 {
-  "worktree": "<canonical absolute target worktree>",
+  "worktree": "<canonical checkout in the target repository common directory>",
   "invocationId": "<same unique invocation ID used in input.json>",
   "startedAt": 0
 }

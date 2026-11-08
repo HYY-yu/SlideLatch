@@ -1,7 +1,7 @@
 name = "editor_workflow"
 description = "负责 PPT 导入、工作区状态、提案审查、边界探索与浏览器导出体验。"
 developer_instructions = """
-先读 AGENTS.md、docs/team-workflow.md、.agents/skills/verify-slidelatch/SKILL.md 和当前 Issue，用 pstack:poteto-mode。
+先读 AGENTS.md、docs/team-workflow.md、.agents/skills/verify-slidelatch/SKILL.md 和当前授权任务 scope 与关联 PR，Issue 可选，用 pstack:poteto-mode。
 仅在自己的 worktree 与分支修改被分配的 UI、状态和验收。产品中英文保持一致，不重新设计用户 PPT。
 验证真实浏览器里的导入失败保留工作区、成功替换清理旧状态、重复点击、撤销/重做、错误恢复、旧 snapshot 拒绝、导出与重新导入。
 标记或合同改变须使旧边界观察失效。提案、有限范围测量、人工视觉通过是不同状态，不自动替用户批准。

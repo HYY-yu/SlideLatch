@@ -1,5 +1,5 @@
 interface:
-  display_name: "SlideLatch single round"
-  short_description: "Run one explicitly authorized host-native Loop A round"
+  display_name: "SlideLatch PR-first round"
+  short_description: "Advance authorized PRs and small tasks with independent acceptance"
 policy:
   allow_implicit_invocation: false
