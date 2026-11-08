@@ -17,6 +17,8 @@
 | [MVP 需求](docs/mvp-requirements.md) | 用户流程、功能范围、数据合同、技术复用与验收 |
 | [决策记录](docs/decisions.md) | 已定方向与待定方案 |
 | [用户验证](docs/validation-plan.md) | 招募、访谈、试点和评估指标 |
+| [首轮社媒运营](docs/research/2026-11-02-social-launch-plan.md) | 四平台抽样、Reddit 目标人群、具体求助、账号与首周执行草案 |
+| [职业社区近七天报告需求](docs/research/2026-11-02-reddit-professional-reporting.md) | 财务、咨询、营销等 11 个社区的近期流程证据、推广密度与筛选结论 |
 | [竞品研究](docs/competitor-research.md) | 竞品能力、需求线索及来源 |
 | [品牌与域名](docs/naming-and-domains.md) | 品牌文案、名称取舍与核查记录 |
 | [支持与事件分析](docs/design/engagement-analytics.md) | 点赞、调查邀请、试用入口、PostHog 配置与 Tally Popup |
