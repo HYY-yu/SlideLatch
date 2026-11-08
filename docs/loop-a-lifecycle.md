@@ -58,3 +58,15 @@ coordinator 把对应 worker 的 `{epoch,token: capability}` 写到独立私有�
 record-review 门禁要求该 reviewer 最近一次受管 verify 为实际 EXITED/code 0，命令启动 HEAD 等于 sealed HEAD，全部命令已退出，且重新读取 reviewer checkout 仍为该 HEAD、工作区干净。失败、运行中或旧 SHA 的 verify 不能由 passed:true 声明覆盖。
 
 writer 的 managed commit 允许合法推进 Git HEAD；租约 head 在 seal-writer 之前仍保留上次封存值。seal-writer 在全部命令退出、actor 停写、工作区干净后读取当前 HEAD，随后 reviewer 独立 checkout 精确新 SHA。pilot 使用 commit 后 verify 顺序，受管 verify 的 identity.head 记录新提交。任何 seal 后 HEAD 改变都会使验收失效。
+
+## Cancellation recovery
+
+New acquisitions use schema 2. The foreground supervisor records successful command results inside its exit transaction: epoch, actor, operation, capture time, HEAD, tree, parents and changed paths. These are Git observations by the supervisor, not worker declarations. Schema 1 remains readable but is never upgraded into mechanical commit evidence from a verify record.
+
+The coordinator may `revoke-actor` only after complete, current stop evidence. The actor capability becomes null while identity, authorship and a revocation audit result remain. Old schema-1 helpers reject the revoked token before operation replay. Deadline expiry permits this cleanup but not new work.
+
+`cancel-release` requires every historical actor bound, stopped and revoked; every command EXITED with groupGone; complete matching stop observations later than command exits; no pending mutation; and a clean stable repository within the allowed history and paths. Its binding names epoch, revision, canonical cwd/common directory, branch, base, original head, paths, observedHead, tree and parents. Supply a reason and exact recovery codeVersion. New schema uses `supervisor-evidence`. Legacy schema requires explicit `legacy-audited` mode plus an independent reviewer, authorization, source, observation time and identical binding. Human audit and external-process absence are attestations, not OS-enforced proofs.
+
+Cancellation preserves the original lease head and records observedHead separately. Its only terminal state is CANCELLED_RELEASED, never successful RELEASED. The success helper rejects it. The transaction persists cancellation and its operation before renaming the entire lock to cancelled-EPOCH. Failed rename retains the lock. Identical authenticated retries finish archival before reporting success; archived retries address only that epoch and cannot modify a successor lease. Unknown transactions remain blocked rather than being removed automatically.
+
+CLI `bind-worker` takes coordinator capability as its opaque third argument and a data.capabilityOutput path outside the repository. It generates the worker token internally, writes a new 0600 file and binds it without returning the token. Hand only that path to the worker. Neither coordinator nor worker should cat, open, read, echo, combine-read or forward capability contents. This cooperative contract is not an OS sandbox and does not revoke historical log copies by rotating values.

@@ -10,7 +10,7 @@ function fixture() {
  const r={repository:p.repository,issue:13,head,draft:true,url:s.pr.url,run:'run',mergeSha:base,passed:true,source:'GitHub',observedAt:70}; return [p,s,r];
 }
 test('complete requires the full structural evidence set',()=> assert.equal(complete(...fixture(),100).head,head));
-for (const [name, mutate] of Object.entries({wrongOwner:s=>{s.owner='other';},wrongAuthorization:s=>{s.authorization='other';},missingCommandStop:s=>{s.stopEvidence.commandIds=[];},futureStop:s=>{s.stopEvidence.observations[0].observedAt=200;},failedLatest:s=>{s.commands.push({...s.commands[0],exit:{...s.commands[0].exit,code:1}});},wrongPr:s=>{s.pr.url='https://github.com/wrong/repo/pull/123';},cancel:s=>{s.review=null;},oldHead:s=>{s.head=base;},pending:s=>{s.commands[0].status='PENDING';},unknown:s=>{s.commands[0].status='UNCERTAIN';},fakeExit:s=>{s.commands[0].exit=null;},authorReview:s=>{s.authors.push('reviewer');},missingStop:s=>{s.stopEvidence=null;},oldVerify:s=>{s.commands[0].identity.head=base;},noPr:s=>{s.pr=null;},noCi:s=>{s.ci=null;},notReleased:s=>{s.phase='CI';},repair:s=>{s.repair=3;}})) test(`reject ${name}`,()=>{const f=fixture();mutate(f[1]);assert.throws(()=>complete(...f,100));});
+for (const [name, mutate] of Object.entries({wrongOwner:s=>{s.owner='other';},wrongAuthorization:s=>{s.authorization='other';},missingCommandStop:s=>{s.stopEvidence.commandIds=[];},futureStop:s=>{s.stopEvidence.observations[0].observedAt=200;},failedLatest:s=>{s.commands.push({...s.commands[0],exit:{...s.commands[0].exit,code:1}});},wrongPr:s=>{s.pr.url='https://github.com/wrong/repo/pull/123';},cancel:s=>{s.review=null;},oldHead:s=>{s.head=base;},pending:s=>{s.commands[0].status='PENDING';},unknown:s=>{s.commands[0].status='UNCERTAIN';},fakeExit:s=>{s.commands[0].exit=null;},authorReview:s=>{s.authors.push('reviewer');},missingStop:s=>{s.stopEvidence=null;},oldVerify:s=>{s.commands[0].identity.head=base;},noPr:s=>{s.pr=null;},noCi:s=>{s.ci=null;},cancelledRelease:s=>{s.phase='CANCELLED_RELEASED';},notReleased:s=>{s.phase='CI';},repair:s=>{s.repair=3;}})) test(`reject ${name}`,()=>{const f=fixture();mutate(f[1]);assert.throws(()=>complete(...f,100));});
 test('reject stale remote and deadline',()=>{const f=fixture();f[2].head=base;assert.throws(()=>complete(...f,100));assert.throws(()=>complete(...fixture(),1001));});
 test('missing or invalid invocation is rejected before side effects',async()=>{for(const p of [undefined,{}, {version:1,repository:'HYY-yu/SlideLatch',issue:13}]) await assert.rejects(prepare(p));});
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -30,8 +30,29 @@ test('prepare uses real independent Git worktrees and rejects path and SHA drift
  await new Promise(r=>setTimeout(r,150));
  const cap=await acquire(task,{issue:13,authorization:'test',owner:'test',paths:['file'],timeoutMs:100});
  assert.ok((await inspect(task)).deadline>deadline);
- await assert.rejects(admit({worktree:task,deadline},cap),/empty lease safely released/);
+ await assert.rejects(admit({worktree:task,deadline,entrySha:h},cap),/empty lease cancelled/);
  await assert.rejects(inspect(task),/ENOENT/);
  for(const patch of [{paths:['../escape']},{paths:['*']},{entrySha:base},{baseSha:base},{worktree:repo},{startedAt:-1200000},{publish:false}]) await assert.rejects(prepare({...input,...patch},101));
  } finally {await rm(root,{recursive:true,force:true});}
+});
+
+test('invocation start is exclusive and preserves caller budget', async () => {
+  const { beginInvocation } = await import('../scripts/loop-a-once.mjs');
+  const { mkdtemp, rm, readFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const root = await mkdtemp(join(tmpdir(), 'slidelatch-invocation-'));
+  try {
+    const path = join(root, 'invocation.json');
+    const now = Date.now();
+    const first = await beginInvocation(path, { invocationId: 'fixture', startedAt: now - 100 }, now);
+    assert.equal(first.startedAt, now - 100);
+    assert.equal(first.timingSource, 'caller-attested-dispatch-time');
+    await assert.rejects(beginInvocation(path, { invocationId: 'fixture', startedAt: now }, now), /EEXIST/);
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), first);
+    await assert.rejects(beginInvocation(join(root, 'future'), { invocationId: 'fixture', startedAt: now + 1 }, now), /original start/);
+    const fallback = await beginInvocation(join(root, 'fallback'), { invocationId: 'fallback' }, now);
+    assert.equal(fallback.startedAt, now);
+    assert.equal(fallback.timingSource, 'first-observable-entry');
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, rename, rmdir, realpath, lstat } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, rmdir, realpath, lstat, open } from 'node:fs/promises';
 import { join, resolve, relative, dirname } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
@@ -21,10 +21,14 @@ async function atomic(path, data) {
   const temp = `${path}.${randomUUID()}`;
   await writeFile(temp, JSON.stringify(data), { mode: 0o600, flag: 'wx' });
   await rename(temp, path);
+  const file = await open(path, 'r'); try { await file.sync(); } finally { await file.close(); }
+  const directory = await open(dirname(path), 'r'); try { await directory.sync(); } finally { await directory.close(); }
 }
 function valid(s) {
-  assert(s && s.version === 1 && typeof s.epoch === 'string' && Number.isSafeInteger(s.revision) && s.revision >= 0 && Array.isArray(s.authors) && Array.isArray(s.actors) && s.operations && Number.isFinite(s.deadline) && ['ACTIVE','SEALED','REVIEWED','PR','CI','STOPPING','QUIESCENT','RELEASED','BLOCKED_UNCERTAIN'].includes(s.phase), 'invalid lifecycle state');
+  assert(s && [1, 2].includes(s.version) && typeof s.epoch === 'string' && Number.isSafeInteger(s.revision) && s.revision >= 0 && Array.isArray(s.authors) && Array.isArray(s.actors) && s.operations && Number.isFinite(s.deadline) && ['ACTIVE','SEALED','REVIEWED','PR','CI','STOPPING','QUIESCENT','RELEASED','BLOCKED_UNCERTAIN','CANCELLED_RELEASED'].includes(s.phase), 'invalid lifecycle state');
   const keys = 'version epoch revision phase issue authorization owner cwd branch base head paths deadline coordinator actors authors operations repair review pr ci commands stopEvidence progress stagnant mutation definitions'.split(' ').sort();
+  if (s.version === 2) keys.push('cancellation');
+  keys.sort();
   assert(Object.keys(s).sort().join() === keys.join(), 'unknown state fields');
   assert(Number.isSafeInteger(s.issue) && s.issue > 0 && [s.authorization,s.owner,s.cwd,s.branch].every(x => typeof x === 'string' && x.length) && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(s.base) && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(s.head) && /^[a-f0-9]{64}$/.test(s.coordinator), 'invalid state metadata');
   assert(Array.isArray(s.paths) && s.paths.length && s.paths.every(x => typeof x === 'string') && Array.isArray(s.commands) && s.authors.every(x => typeof x === 'string') && Number.isSafeInteger(s.repair) && s.repair >= 0 && s.repair <= 2 && Number.isSafeInteger(s.stagnant) && s.stagnant >= 0 && s.stagnant <= 2, 'invalid state collections');
@@ -32,10 +36,11 @@ function valid(s) {
   assert(s.actors.filter(a => a.role === 'writer' && !a.stopped).length <= 1, 'multiple writers');
   assert(s.operations && Object.getPrototypeOf(s.operations) === Object.prototype && !Array.isArray(s.operations), 'invalid operations');
   for (const op of Object.values(s.operations)) assert(op && Object.keys(op).sort().join() === 'payload,result' && /^[a-f0-9]{64}$/.test(op.payload) && op.result?.epoch === s.epoch && Number.isSafeInteger(op.result.revision), 'invalid operation record');
-  for (const c of s.commands) assert(c && Object.keys(c).sort().join() === 'actor,exit,id,identity,label,nonce,status' && typeof c.id === 'string' && typeof c.actor === 'string' && typeof c.nonce === 'string' && ['verify','commit'].includes(c.label) && ['PENDING','EXITED','UNCERTAIN'].includes(c.status), 'invalid command record');
+  for (const c of s.commands) assert(c && Object.keys(c).sort().join() === (s.version === 2 ? 'actor,exit,id,identity,label,nonce,result,status' : 'actor,exit,id,identity,label,nonce,status') && typeof c.id === 'string' && typeof c.actor === 'string' && typeof c.nonce === 'string' && ['verify','commit'].includes(c.label) && ['PENDING','EXITED','UNCERTAIN'].includes(c.status), 'invalid command record');
   assert(s.definitions && Object.keys(s.definitions).sort().join() === 'environment,git,node,npm' && s.definitions.node === process.execPath && s.definitions.git === '/usr/bin/git' && typeof s.definitions.npm === 'string' && JSON.stringify(s.definitions.environment) === JSON.stringify(environment), 'invalid command definitions');
   assert(s.stopEvidence === null || s.stopEvidence && Object.keys(s.stopEvidence).sort().join() === 'at,commandIds,observations' && Array.isArray(s.stopEvidence.observations) && Array.isArray(s.stopEvidence.commandIds) && Number.isFinite(s.stopEvidence.at), 'invalid stop evidence');
   for (const c of s.commands) {
+    if (s.version === 2) assert(c.result === null || c.result && c.status === 'EXITED' && c.exit?.code === 0 && c.result.epoch === s.epoch && c.result.actor === c.actor && c.result.operation === c.id && Number.isFinite(c.result.at) && c.result.at >= c.exit.ended && /^[a-f0-9]{40}$/.test(c.result.head) && /^[a-f0-9]{40}$/.test(c.result.tree) && Array.isArray(c.result.parents) && Array.isArray(c.result.paths), 'invalid supervisor result');
     assert(c.identity === null || c.identity && Object.keys(c.identity).sort().join() === 'head,pid,started,supervisor' && Number.isInteger(c.identity.pid) && Number.isFinite(c.identity.started) && Number.isInteger(c.identity.supervisor), 'invalid process identity');
     assert(c.status !== 'EXITED' || c.identity && c.exit && c.exit.pid === c.identity.pid && c.exit.started === c.identity.started && c.exit.groupGone === true && Number.isFinite(c.exit.ended) && c.exit.ended >= c.exit.started, 'invalid exit evidence');
   }
@@ -46,6 +51,10 @@ function valid(s) {
   assert(!['REVIEWED','PR','CI'].includes(s.phase) || s.review, 'missing review state');
   assert(!['PR','CI'].includes(s.phase) || s.pr, 'missing PR state');
   assert(s.phase !== 'CI' || s.ci, 'missing CI state');
+  if (s.version === 2) {
+    assert((s.phase === 'CANCELLED_RELEASED') === (s.cancellation !== null), 'invalid cancellation state');
+    if (s.cancellation) assert(['legacy-audited', 'supervisor-evidence'].includes(s.cancellation.mode) && s.cancellation.binding?.epoch === s.epoch && s.cancellation.binding.head === s.head && s.cancellation.binding.base === s.base && s.cancellation.binding.cwd === s.cwd && Number.isFinite(s.cancellation.at) && typeof s.cancellation.reason === 'string' && s.cancellation.reason.length && /^[a-f0-9]{64}$/.test(s.cancellation.implementationHash), 'invalid cancellation audit');
+  }
   return s;
 }
 export async function acquire(cwd, input) {
@@ -57,7 +66,7 @@ export async function acquire(cwd, input) {
   await mkdir(p.root, { recursive: true });
   await mkdir(p.lock); // Existing/creating/crashed locks are never reclaimed.
   const token = randomUUID();
-  const s = { version: 1, epoch: randomUUID(), revision: 0, phase: 'ACTIVE', issue: input.issue, authorization: input.authorization, owner: input.owner, cwd: p.cwd, branch: await git(cwd, 'branch', '--show-current'), base: await git(cwd, 'rev-parse', 'HEAD'), head: await git(cwd, 'rev-parse', 'HEAD'), paths: input.paths, mutation: null, definitions: { node: process.execPath, git: '/usr/bin/git', npm: await realpath(join(dirname(process.execPath), 'npm')), environment }, commands: [], stopEvidence: null, progress: null, stagnant: 0, deadline: Date.now() + timeout, coordinator: digest(token), actors: [], authors: [], operations: {}, repair: 0, review: null, pr: null, ci: null };
+  const s = { version: 2, cancellation: null, epoch: randomUUID(), revision: 0, phase: 'ACTIVE', issue: input.issue, authorization: input.authorization, owner: input.owner, cwd: p.cwd, branch: await git(cwd, 'branch', '--show-current'), base: await git(cwd, 'rev-parse', 'HEAD'), head: await git(cwd, 'rev-parse', 'HEAD'), paths: input.paths, mutation: null, definitions: { node: process.execPath, git: '/usr/bin/git', npm: await realpath(join(dirname(process.execPath), 'npm')), environment }, commands: [], stopEvidence: null, progress: null, stagnant: 0, deadline: Date.now() + timeout, coordinator: digest(token), actors: [], authors: [], operations: {}, repair: 0, review: null, pr: null, ci: null };
   await atomic(join(p.lock, 'state.json'), s);
   return { epoch: s.epoch, revision: 0, token };
 }
@@ -81,8 +90,8 @@ export async function inspect(cwd) {
 export async function transition(cwd, request, internal = null) {
   if (request.action.startsWith('command-')) assert(internal?.key === SUPERVISOR, 'supervisor-only operation');
   const p = await location(cwd);
-  if (request.action === 'release' && /^[a-f0-9-]{36}$/.test(request.epoch)) {
-    const archive = join(p.root, `released-${request.epoch}`);
+  if (['release', 'cancel-release'].includes(request.action) && /^[a-f0-9-]{36}$/.test(request.epoch)) {
+    const archive = join(p.root, `${request.action === 'cancel-release' ? 'cancelled' : 'released'}-${request.epoch}`);
     try { await lstat(archive); p.lock = archive; } catch (e) { if (e.code !== 'ENOENT') throw e; }
   }
   let tx = join(p.lock, 'transaction');
@@ -99,10 +108,19 @@ export async function transition(cwd, request, internal = null) {
     const payload = digest({ action: request.action, data: request.data, actor: coordinator ? 'coordinator' : actor.id });
     assert(!['__proto__','constructor','prototype'].includes(request.operation_id), 'invalid operation ID');
     const prior = Object.hasOwn(s.operations, request.operation_id) ? s.operations[request.operation_id] : null;
-    if (prior) { assert(prior.payload === payload, 'operation payload conflict'); return prior.result; }
+    const archiveCancellation = async () => {
+      const archive = join(p.root, `cancelled-${s.epoch}`);
+      if (p.lock !== archive) {
+        try { await lstat(archive); throw Error('cancellation archive collision; lock retained'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+        await rename(p.lock, archive); tx = join(archive, 'transaction');
+        const directory = await open(p.root, 'r'); try { await directory.sync(); } finally { await directory.close(); }
+      }
+    };
+    if (prior) { assert(prior.payload === payload, 'operation payload conflict'); if (s.phase === 'CANCELLED_RELEASED') await archiveCancellation(); return prior.result; }
+    assert(s.phase !== 'CANCELLED_RELEASED', 'cancelled terminal state');
     assert(request.expected_revision === s.revision, 'revision conflict');
     const d = request.data ?? {};
-    if (Date.now() >= s.deadline && !['request-stop','confirm-quiescent','revoke-actor','release','command-exit'].includes(request.action)) {
+    if (Date.now() >= s.deadline && !['request-stop','confirm-quiescent','revoke-actor','cancel-release','release','command-exit'].includes(request.action)) {
       s.phase = 'STOPPING'; s.revision++; await atomic(join(p.lock, 'state.json'), s); throw Error('deadline reached; lock retained');
     }
     if (['record-review','record-pr','record-ci','release'].includes(request.action) && await git(s.cwd, 'rev-parse', 'HEAD') !== s.head) {
@@ -136,7 +154,7 @@ export async function transition(cwd, request, internal = null) {
       }
       case 'command-intent':
         assert(actor && !actor.stopped && (actor.role === 'writer' && s.phase === 'ACTIVE' && ['verify','commit'].includes(d.label) || actor.role === 'reviewer' && s.phase === 'SEALED' && d.label === 'verify') && typeof d.nonce === 'string' && !s.commands.some(c => c.status !== 'EXITED'), 'command forbidden');
-        s.commands.push({ id: request.operation_id, actor: actor.id, label: d.label, nonce: d.nonce, status: 'PENDING', identity: null, exit: null }); break;
+        s.commands.push({ id: request.operation_id, actor: actor.id, label: d.label, nonce: d.nonce, status: 'PENDING', identity: null, exit: null, ...(s.version === 2 ? { result: null } : {}) }); break;
       case 'command-start': {
         const c = s.commands.find(c => c.id === d.id);
         assert(c?.status === 'PENDING' && !c.identity && !actor.stopped && ['ACTIVE','SEALED'].includes(s.phase), 'spawn stopped or uncertain');
@@ -148,6 +166,15 @@ export async function transition(cwd, request, internal = null) {
         const c = s.commands.find(c => c.id === d.id);
         assert(actor && c?.actor === actor.id && c.status === 'PENDING' && c.nonce === d.nonce && c.identity?.pid === d.evidence?.pid && c.identity?.started === d.evidence?.started && d.evidence && typeof d.evidence.started === 'number' && typeof d.evidence.pid === 'number', 'command ownership evidence required');
         c.status = d.evidence.groupGone === true && (Number.isInteger(d.evidence.code) || typeof d.evidence.signal === 'string') ? 'EXITED' : 'UNCERTAIN'; c.exit = d.evidence;
+        if (s.version === 2 && c.status === 'EXITED' && c.exit.code === 0) {
+          const head = await git(p.cwd, 'rev-parse', 'HEAD');
+          const tree = await git(p.cwd, 'rev-parse', 'HEAD^{tree}');
+          const parents = (await git(p.cwd, 'show', '-s', '--format=%P', head)).split(' ').filter(Boolean);
+          const paths = c.label === 'commit' ? (await git(p.cwd, 'diff-tree', '--no-commit-id', '--name-only', '-r', head)).split('\n').filter(Boolean) : [];
+          c.result = { epoch: s.epoch, actor: c.actor, operation: c.id, at: Date.now(), head, tree, parents, paths };
+          if (c.label === 'commit') assert(parents.length === 1 && parents[0] === c.identity.head && paths.every(path => s.paths.includes(path)), 'commit result outside approved history or scope');
+          else assert(head === c.identity.head, 'verify head changed');
+        }
         if (c.status === 'UNCERTAIN') s.phase = 'BLOCKED_UNCERTAIN'; break;
       }
       case 'repair':
@@ -158,12 +185,42 @@ export async function transition(cwd, request, internal = null) {
       case 'confirm-quiescent':
         needCoordinator(); assert(Array.isArray(d.observations) && d.observations.length === s.actors.length && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true) && s.actors.every(a => a.id && d.observations.some(o => o.id === a.id && o.status === 'stop-acknowledged' && o.noExternalProcesses === true && typeof o.source === 'string' && o.source.length > 0 && Number.isFinite(o.observedAt) && o.observedAt >= a.lastActivity && o.observedAt <= Date.now())), 'positive actor stop evidence required');
         s.actors.forEach(a => { a.stopped = true; }); s.stopEvidence = { observations: d.observations, commandIds: s.commands.map(c => c.id), at: Date.now() }; if (!['SEALED','REVIEWED','PR','CI'].includes(s.phase)) s.phase = 'QUIESCENT'; break;
+      case 'cancel-release': {
+        needCoordinator();
+        assert(s.phase === 'QUIESCENT' && s.stopEvidence && s.actors.every(a => a.id && a.stopped && a.capability === null), 'all actors must be stopped and revoked');
+        const proof = s.stopEvidence;
+        assert(proof.observations.length === s.actors.length && new Set(proof.observations.map(o => o.id)).size === s.actors.length && proof.commandIds.length === s.commands.length && new Set(proof.commandIds).size === s.commands.length && s.actors.every(a => proof.observations.some(o => o.id === a.id && o.status === 'stop-acknowledged' && o.noExternalProcesses === true && o.observedAt >= a.lastActivity && o.observedAt <= proof.at && proof.at <= Date.now())) && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true && proof.commandIds.includes(c.id) && proof.at >= c.exit.ended && proof.observations.some(o => o.id === c.actor && o.observedAt >= c.exit.ended)), 'latest complete stop evidence required');
+        const binding = d.binding;
+        assert(binding && binding.epoch === s.epoch && binding.revision === s.revision && binding.cwd === p.cwd && binding.common === dirname(p.root) && binding.branch === s.branch && binding.base === s.base && binding.head === s.head && JSON.stringify(binding.paths) === JSON.stringify(s.paths), 'cancellation binding mismatch');
+        const observedHead = await git(p.cwd, 'rev-parse', 'HEAD');
+        const tree = await git(p.cwd, 'rev-parse', 'HEAD^{tree}');
+        const parents = (await git(p.cwd, 'show', '-s', '--format=%P', observedHead)).split(' ').filter(Boolean);
+        assert(binding.observedHead === observedHead && binding.tree === tree && JSON.stringify(binding.parents) === JSON.stringify(parents) && await git(p.cwd, 'branch', '--show-current') === s.branch && !(await git(p.cwd, 'status', '--porcelain')), 'cancellation repository drift');
+        const commits = (await git(p.cwd, 'rev-list', `${s.base}..${observedHead}`)).split('\n').filter(Boolean);
+        assert(await git(p.cwd, 'merge-base', s.base, observedHead) === s.base, 'cancellation base drift');
+        for (const head of commits) {
+          const lineage = (await git(p.cwd, 'show', '-s', '--format=%P', head)).split(' ').filter(Boolean);
+          const paths = (await git(p.cwd, 'diff-tree', '--no-commit-id', '--name-only', '-r', head)).split('\n').filter(Boolean);
+          assert(lineage.length === 1 && paths.every(path => s.paths.includes(path)), 'cancellation history outside scope');
+          const commitTree = await git(p.cwd, 'rev-parse', `${head}^{tree}`);
+          if (s.version === 2) assert(s.commands.some(c => c.label === 'commit' && c.result?.head === head && c.result.epoch === s.epoch && c.result.operation === c.id && c.result.actor === c.actor && c.result.parents[0] === lineage[0] && c.result.tree === commitTree), 'missing supervisor commit result');
+        }
+        assert(typeof d.reason === 'string' && d.reason.trim() && typeof d.codeVersion === 'string' && /^[a-f0-9]{40}$/.test(d.codeVersion), 'cancellation reason and code version required');
+        const legacy = s.version === 1;
+        if (legacy) assert(d.mode === 'legacy-audited' && d.audit && typeof d.audit.reviewer === 'string' && !s.authors.includes(d.audit.reviewer) && d.audit.reviewer.length && d.audit.authorization?.trim() && d.audit.source?.trim() && d.audit.observedAt >= proof.at && d.audit.observedAt <= Date.now() && JSON.stringify(d.audit.binding) === JSON.stringify(binding), 'explicit independent legacy audit required');
+        else assert(d.mode === 'supervisor-evidence', 'explicit supervisor evidence mode required');
+        assert(await git(p.cwd, 'rev-parse', 'HEAD') === observedHead && !(await git(p.cwd, 'status', '--porcelain')), 'cancellation head changed');
+        if (legacy) { s.version = 2; s.commands.forEach(c => { c.result = null; }); }
+        s.cancellation = { mode: d.mode, validation: legacy ? 'independent-human-audit' : 'supervisor-records-with-host-stop-attestation', binding, reason: d.reason, codeVersion: d.codeVersion, implementationHash: digest(await readFile(fileURLToPath(import.meta.url), 'utf8')), audit: legacy ? d.audit : null, at: Date.now() };
+        s.phase = 'CANCELLED_RELEASED';
+        break;
+      }
       case 'revoke-actor': {
         needCoordinator();
         const target = s.actors.find(a => a.id === d.actor);
         const proof = s.stopEvidence;
         assert(s.phase === 'QUIESCENT' && target?.stopped && proof && typeof d.reason === 'string' && d.reason.trim(), 'quiescent actor and revocation reason required');
-        assert(proof.observations.length === s.actors.length && new Set(proof.observations.map(o => o.id)).size === s.actors.length && proof.commandIds.length === s.commands.length && new Set(proof.commandIds).size === s.commands.length && s.actors.every(a => a.id && a.stopped && proof.observations.some(o => o.id === a.id && o.status === 'stop-acknowledged' && o.noExternalProcesses === true && o.observedAt >= a.lastActivity)) && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true && proof.commandIds.includes(c.id) && proof.at >= c.exit.ended && proof.observations.some(o => o.id === c.actor && o.observedAt >= c.exit.ended)), 'latest complete stop evidence required');
+        assert(proof.observations.length === s.actors.length && new Set(proof.observations.map(o => o.id)).size === s.actors.length && proof.commandIds.length === s.commands.length && new Set(proof.commandIds).size === s.commands.length && s.actors.every(a => a.id && a.stopped && proof.observations.some(o => o.id === a.id && o.status === 'stop-acknowledged' && o.noExternalProcesses === true && o.observedAt >= a.lastActivity && o.observedAt <= proof.at && proof.at <= Date.now())) && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true && proof.commandIds.includes(c.id) && proof.at >= c.exit.ended && proof.observations.some(o => o.id === c.actor && o.observedAt >= c.exit.ended)), 'latest complete stop evidence required');
         target.capability = null;
         break;
       }
@@ -187,6 +244,7 @@ export async function transition(cwd, request, internal = null) {
     s.operations[request.operation_id] = { payload, result };
     valid(s);
     await atomic(join(p.lock, 'state.json'), s);
+    if (s.phase === 'CANCELLED_RELEASED') await archiveCancellation();
     if (s.phase === 'RELEASED') { const archive = join(p.root, `released-${s.epoch}`); await rename(p.lock, archive); tx = join(archive, 'transaction'); }
     return result;
   } finally { await rmdir(tx).catch(e => { if (e.code !== 'ENOENT') throw e; }); }
@@ -258,6 +316,22 @@ export async function managedCommand(cwd, request) {
   return transition(cwd, { ...request, expected_revision: current.revision, operation_id: `${request.operation_id}:exit`, action: 'command-exit', data: { id: request.operation_id, nonce, evidence } }, { key: SUPERVISOR });
 }
 
+export async function bindWorkerFile(cwd, request, output) {
+  const targetDirectory = await realpath(dirname(resolve(output)));
+  const locationInfo = await location(cwd);
+  assert(![locationInfo.cwd, dirname(locationInfo.root)].some(root => targetDirectory === root || !relative(root, targetDirectory).startsWith('..')), 'capability output must be outside repository');
+  let insideRepository = false;
+  try { await git(targetDirectory, 'rev-parse', '--show-toplevel'); insideRepository = true; } catch {}
+  assert(!insideRepository, 'capability output must be outside repository');
+  const token = randomUUID();
+  const handle = await open(output, 'wx', 0o600);
+  try {
+    await handle.writeFile(JSON.stringify({ epoch: request.epoch, token }));
+    await handle.sync();
+    return await transition(cwd, { ...request, action: 'bind-actor', data: { ...request.data, capability: token } });
+  } finally { await handle.close(); }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const [action, file, capabilityFile] = process.argv.slice(2);
@@ -275,8 +349,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         assert(capabilityFile, 'private capability file required');
         const cap = JSON.parse(await readFile(capabilityFile, 'utf8'));
         const request = { ...input, epoch: cap.epoch, token: cap.token, action };
-        console.log(JSON.stringify(action === 'managed-command' ? await managedCommand(process.cwd(), request) : await transition(process.cwd(), request)));
+        if (action === 'bind-worker') { const { capabilityOutput, ...data } = input.data; console.log(JSON.stringify(await bindWorkerFile(process.cwd(), { ...request, data }, capabilityOutput))); }
+        else console.log(JSON.stringify(action === 'managed-command' ? await managedCommand(process.cwd(), request) : await transition(process.cwd(), request)));
       }
     }
-  } catch (error) { console.error(error.message); process.exitCode = 1; }
+  } catch (error) { console.error(error instanceof SyntaxError ? 'invalid JSON input' : error.message); process.exitCode = 1; }
 }

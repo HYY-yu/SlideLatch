@@ -28,13 +28,26 @@ export async function admit(p, cap) {
   if (s.epoch === cap.epoch && s.phase === 'ACTIVE' && s.actors.length === 0 && s.commands.length === 0 && s.deadline <= p.deadline && Date.now() < p.deadline) return { status: 'READY', epoch: s.epoch, deadline: s.deadline };
   // Only an empty lease can be safely cancelled here. Unknown state retains its lock.
   if (s.epoch !== cap.epoch || s.actors.length || s.commands.length || s.mutation) throw Error('BLOCKED_UNCERTAIN: admission failed; lock retained');
-  for (const [action, data] of [['request-stop', {}], ['confirm-quiescent', { observations: [] }], ['release', {}]]) {
+  for (const [action, data] of [['request-stop', {}], ['confirm-quiescent', { observations: [] }]]) {
     const current = await inspect(p.worktree);
     await transition(p.worktree, { ...cap, expected_revision: current.revision, operation_id: `admission-${action}`, action, data });
   }
-  throw Error('BLOCKED_DEADLINE: empty lease safely released before dispatch');
+  const stopped = await inspect(p.worktree);
+  const binding = { epoch: stopped.epoch, revision: stopped.revision, cwd: stopped.cwd, common: await realpath(resolve(p.worktree, git(p.worktree, 'rev-parse', '--git-common-dir'))), branch: stopped.branch, base: stopped.base, head: stopped.head, paths: stopped.paths, observedHead: git(p.worktree, 'rev-parse', 'HEAD'), tree: git(p.worktree, 'rev-parse', 'HEAD^{tree}'), parents: git(p.worktree, 'show', '-s', '--format=%P', 'HEAD').split(' ').filter(Boolean) };
+  await transition(p.worktree, { ...cap, expected_revision: stopped.revision, operation_id: 'admission-cancel', action: 'cancel-release', data: { binding, mode: 'supervisor-evidence', reason: 'admission deadline exceeded before dispatch', codeVersion: p.entrySha } });
+  throw Error('BLOCKED_DEADLINE: empty lease cancelled before dispatch');
+}
+export async function beginInvocation(file, input = {}, now = Date.now()) {
+  const startedAt = input.startedAt ?? now;
+  requireValue(Number.isSafeInteger(startedAt) && startedAt <= now && now < startedAt + 1200000 && typeof input.invocationId === 'string' && input.invocationId.length, 'valid invocation identity and original start required');
+  const record = { version: 1, invocationId: input.invocationId, startedAt, recordedAt: now, timingSource: input.startedAt === undefined ? 'first-observable-entry' : 'caller-attested-dispatch-time' };
+  await writeFile(file, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
+  return record;
 }
 export async function acquireOnce(input, capabilityFile) {
+  requireValue(typeof input.invocationRecord === 'string', 'immutable invocation record required');
+  const invocation = JSON.parse(await readFile(input.invocationRecord, 'utf8'));
+  requireValue(invocation.version === 1 && invocation.invocationId === input.invocationId && invocation.startedAt === input.startedAt && invocation.recordedAt >= invocation.startedAt && invocation.recordedAt <= Date.now(), 'invocation budget mismatch');
   const p = await prepare(input);
   const timeoutMs = p.deadline - Date.now() - 1000;
   requireValue(timeoutMs > 0, 'insufficient remaining deadline');
@@ -58,13 +71,18 @@ export function complete(p, s, remote, now = Date.now()) {
     requireValue(c?.identity?.head === s.head && c.exit?.code === 0, 'latest exact-head verification required');
   }
   requireValue(s.commands.some(c => c.label === 'commit'), 'commit required');
+  if (s.version === 2) {
+    requireValue(s.commands.some(c => c.label === 'commit' && c.result?.head === s.head && c.result.epoch === s.epoch && c.result.operation === c.id && c.result.actor === c.actor), 'supervisor commit result required');
+    for (const c of s.commands.filter(c => c.label === 'verify' && c.identity?.head === s.head)) requireValue(c.result?.head === s.head && c.result.epoch === s.epoch && c.result.operation === c.id && c.result.actor === c.actor, 'supervisor verify result required');
+  }
   for (const c of s.commands) requireValue(s.stopEvidence.commandIds?.includes(c.id) && c.status === 'EXITED' && c.identity && c.exit && c.identity.pid === c.exit.pid && c.identity.started === c.exit.started && c.exit.groupGone === true && c.exit.ended >= c.identity.started, 'actual command exit required');
   requireValue(remote?.repository === p.repository && remote.issue === p.issue && remote.head === s.head && remote.draft === true && remote.url === s.pr.url && remote.run === s.ci.run && remote.mergeSha === s.ci.mergeSha && remote.passed === true && remote.source && Number.isFinite(remote.observedAt) && remote.observedAt >= s.stopEvidence.at && remote.observedAt <= now, 'fresh remote evidence required');
   return { status: 'RELEASED', validation: 'structural-only', head: s.head, pr: s.pr.url, run: s.ci.run };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
-    if (process.argv[2] === 'acquire') { console.log(JSON.stringify(await acquireOnce(JSON.parse(await readFile(process.argv[3], 'utf8')), process.argv[4]))); } else {
+    if (process.argv[2] === 'begin') { console.log(JSON.stringify(await beginInvocation(process.argv[4], JSON.parse(await readFile(process.argv[3], 'utf8'))))); }
+    else if (process.argv[2] === 'acquire') { console.log(JSON.stringify(await acquireOnce(JSON.parse(await readFile(process.argv[3], 'utf8')), process.argv[4]))); } else {
     const args = await Promise.all(process.argv.slice(3).map(p => readFile(p, 'utf8').then(JSON.parse)));
     requireValue(['prepare', 'complete'].includes(process.argv[2]), 'use prepare input.json or complete plan.json archive.json remote.json');
     console.log(JSON.stringify(await (process.argv[2] === 'prepare' ? prepare(args[0]) : complete(...args)), null, 2));

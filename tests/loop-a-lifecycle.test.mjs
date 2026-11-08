@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile, realpath, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -291,8 +291,88 @@ for (const defect of ['missing-command-proof', 'pending', 'uncertain', 'late-com
     if (defect === 'unknown-actor') state.actors.push({ intent: 'unknown', id: null, capability: null, role: 'reviewer', stopped: false, worktree: null, lastActivity: Date.now() });
     if (defect === 'mutation') state.mutation = { operation: 'unknown', path: 'file', contentHash: '0'.repeat(64), status: 'PENDING' };
     await writeFile(path, JSON.stringify(state));
-    await assert.rejects(call(cwd, cap, 'revoke-actor', { actor: 'writer', reason: 'fixture' }), /stop evidence|mutation/);
+    await assert.rejects(call(cwd, cap, 'revoke-actor', { actor: 'writer', reason: 'fixture' }), /stop evidence|mutation|invalid supervisor result/);
     assert.equal(JSON.parse(await readFile(path, 'utf8')).actors[0].capability, state.actors[0].capability);
     await assert.rejects(setup(cwd), /EEXIST/);
   }));
 }
+
+test('cancel archives original head and retries without touching successor lease', () => fixture(async (cwd, root) => {
+  const cap = await setup(cwd);
+  const writer = await bind(cwd, cap, 'writer', 'writer');
+  const original = (await inspect(cwd)).head;
+  await call(cwd, writer, 'write', { path: 'file', content: 'cancelled change' });
+  const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
+  await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: 'commit', data: { label: 'commit' } });
+  await call(cwd, cap, 'request-stop');
+  await call(cwd, cap, 'confirm-quiescent', { observations: [{ id: 'writer', status: 'stop-acknowledged', noExternalProcesses: true, source: 'fixture', observedAt: Date.now() }] });
+  await call(cwd, cap, 'revoke-actor', { actor: 'writer', reason: 'fixture cancellation' });
+  const s = await inspect(cwd);
+  const g = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  const binding = { epoch: s.epoch, revision: s.revision, cwd: s.cwd, common: await realpath(join(root, '.git')), branch: s.branch, base: s.base, head: s.head, paths: s.paths, observedHead: g('rev-parse', 'HEAD'), tree: g('rev-parse', 'HEAD^{tree}'), parents: g('show', '-s', '--format=%P', 'HEAD').split(' ') };
+  const request = { ...cap, expected_revision: s.revision, operation_id: 'cancel', action: 'cancel-release', data: { binding, mode: 'supervisor-evidence', reason: 'synthetic cancellation', codeVersion: original } };
+  for (const field of ['epoch', 'revision', 'cwd', 'common', 'branch', 'base', 'head', 'paths', 'observedHead', 'tree', 'parents']) {
+    const changed = { ...binding, [field]: Array.isArray(binding[field]) ? ['wrong'] : field === 'revision' ? -1 : 'wrong' };
+    await assert.rejects(transition(cwd, { ...request, data: { ...request.data, binding: changed } }), /binding mismatch|repository drift/);
+  }
+  const statePath = join(root, '.git', 'loop-a', 'lock', 'state.json');
+  const saved = await readFile(statePath, 'utf8');
+  const missing = JSON.parse(saved); missing.commands[0].result = null;
+  await writeFile(statePath, JSON.stringify(missing));
+  await assert.rejects(transition(cwd, request), /missing supervisor commit result/);
+  await writeFile(statePath, saved);
+  const controlDirectory = join(root, '.git', 'loop-a');
+  await chmod(controlDirectory, 0o500);
+  try { await assert.rejects(transition(cwd, request), /EACCES|EPERM/); }
+  finally { await chmod(controlDirectory, 0o700); }
+  const retained = JSON.parse(await readFile(join(controlDirectory, 'lock', 'state.json'), 'utf8'));
+  assert.equal(retained.phase, 'CANCELLED_RELEASED');
+  await assert.rejects(setup(cwd), /EEXIST/);
+  const result = await transition(cwd, request);
+  assert.equal(result.phase, 'CANCELLED_RELEASED');
+  const archive = JSON.parse(await readFile(join(root, '.git', 'loop-a', `cancelled-${cap.epoch}`, 'state.json'), 'utf8'));
+  assert.equal(archive.head, original);
+  assert.equal(archive.cancellation.binding.observedHead, binding.observedHead);
+  assert.deepEqual(await transition(cwd, request), result);
+  const successor = await setup(cwd);
+  assert.deepEqual(await transition(cwd, request), result);
+  assert.equal((await inspect(cwd)).epoch, successor.epoch);
+  await assert.rejects(transition(cwd, { ...request, token: writer.token }), /invalid capability/);
+}));
+
+test('legacy cancellation requires separately bound independent audit', () => fixture(async (cwd, root) => {
+  const cap = await setup(cwd);
+  await call(cwd, cap, 'request-stop');
+  await call(cwd, cap, 'confirm-quiescent', { observations: [] });
+  const path = join(root, '.git', 'loop-a', 'lock', 'state.json');
+  const legacy = JSON.parse(await readFile(path, 'utf8'));
+  legacy.version = 1; delete legacy.cancellation;
+  await writeFile(path, JSON.stringify(legacy));
+  const g = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  const binding = { epoch: legacy.epoch, revision: legacy.revision, cwd: legacy.cwd, common: await realpath(join(root, '.git')), branch: legacy.branch, base: legacy.base, head: legacy.head, paths: legacy.paths, observedHead: legacy.head, tree: g('rev-parse', 'HEAD^{tree}'), parents: [] };
+  const request = { ...cap, expected_revision: legacy.revision, operation_id: 'legacy-cancel', action: 'cancel-release', data: { binding, mode: 'legacy-audited', reason: 'fixture', codeVersion: legacy.head } };
+  await assert.rejects(transition(cwd, request), /independent legacy audit/);
+  const audit = { reviewer: 'independent-fixture', authorization: 'fixture approval', source: 'fixture audit', observedAt: Date.now(), binding };
+  const result = await transition(cwd, { ...request, data: { ...request.data, audit } });
+  assert.equal(result.phase, 'CANCELLED_RELEASED');
+  const archived = JSON.parse(await readFile(join(root, '.git', 'loop-a', `cancelled-${cap.epoch}`, 'state.json'), 'utf8'));
+  assert.equal(archived.cancellation.validation, 'independent-human-audit');
+}));
+
+test('worker binding returns no token and reserves an external opaque file', () => fixture(async cwd => {
+  const { bindWorkerFile } = await import('../scripts/loop-a-lifecycle.mjs');
+  const cap = await setup(cwd);
+  await call(cwd, cap, 'dispatch-intent', { role: 'writer' });
+  const state = await inspect(cwd);
+  const request = { ...cap, expected_revision: state.revision, operation_id: 'opaque-bind', data: { intent: state.actors[0].intent, id: 'opaque-worker', worktree: cwd } };
+  await assert.rejects(bindWorkerFile(cwd, request, join(cwd, 'capability.json')), /outside repository/);
+  const external = await mkdtemp(join(tmpdir(), 'slidelatch-opaque-'));
+  try {
+    const output = join(external, 'worker.json');
+    const result = await bindWorkerFile(cwd, request, output);
+    const syntheticCapability = JSON.parse(await readFile(output, 'utf8'));
+    assert.equal(syntheticCapability.epoch, cap.epoch);
+    assert.equal(JSON.stringify(result).includes(syntheticCapability.token), false);
+    await assert.rejects(bindWorkerFile(cwd, request, output), /EEXIST/);
+  } finally { await rm(external, { recursive: true, force: true }); }
+}));
