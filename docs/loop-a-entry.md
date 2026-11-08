@@ -1,4 +1,6 @@
-# 循环 A 单轮入口
+# 循环 A 历史只读探针
+
+正式入口是 `.agents/skills/slidelatch-loop-once/SKILL.md`，使用 PR-first 选择与现有生命周期。本文仅保留 Issue #9 的历史 `loop-a-round.mjs` 只读探针契约，不能用它代替开发循环或调度入口。
 
 Issue #9。在独立 worktree 运行 `node scripts/loop-a-round.mjs /absolute/authorization.json`。不传文件时实际读取 Git 布局后记账并安全返回 no-eligible-issue。主 worktree 拒绝执行。
 
@@ -18,6 +20,6 @@ Issue #9。在独立 worktree 运行 `node scripts/loop-a-round.mjs /absolute/au
 
 超时使用子进程timeout，固定git只读命令没有任意脚本后代。此预算不约束入口之外启动的agent。GUI需求只记录gui-queued，不能宣称全机GUI互斥，LearningPoteto未接入共同锁。文件系统或进程崩溃时保留锁供人工确认。
 
-本轮未注册真实调度，也不要求用户为只读阶段创建调度，因为它不实现开发循环。完整开发循环及其正式调度仍是后续未完成事项。官方调度接入前应确认机器、时间、范围、通知方式及入口精确SHA。调度prompt应先核实来源并创建本地输入，调用一次本入口，busy/paused/依赖等待/待验收/确认/GUI/timeout均停止本轮；不要另开writer或重复PR。当前模式只能检查，不得描述为自动修复已运行。
+此探针不注册调度，也不实现开发循环。调度文本应调用唯一的 slidelatch-loop-once Skill，而不是本历史探针。真实调度是否注册和实际运行需单独核实。
 
 验证 `node --test tests/loop-a-round.test.mjs` 与完整 `npm run verify`。没有产品UI或导出变化，原生PowerPoint/浏览器验收不适用。

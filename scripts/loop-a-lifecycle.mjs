@@ -6,11 +6,40 @@ import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { userInfo } from 'node:os';
 const SUPERVISOR = Symbol('private supervisor authority');
+const PROJECT_CHECKS = Object.freeze(['verify', 'cloudflare-root-install']);
 const environment = { PATH: `${dirname(process.execPath)}:/opt/homebrew/bin:/usr/bin:/bin`, HOME: userInfo().homedir, LANG: 'C.UTF-8', GIT_TERMINAL_PROMPT: '0' };
 const exec = promisify(execFile);
 const digest = x => createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const assert = (x, message) => { if (!x) throw Error(message); };
 const git = async (cwd, ...args) => (await exec('/usr/bin/git', ['--no-optional-locks', '-C', cwd, ...args], { env: environment })).stdout.trim();
+const sha = value => /^[a-f0-9]{40}$/.test(value ?? '');
+const issue = value => value === null || Number.isSafeInteger(value) && value > 0;
+const fresh = (value, now) => Number.isSafeInteger(value) && value <= now && now - value <= 60000;
+const prUrl = number => `https://github.com/HYY-yu/SlideLatch/pull/${number}`;
+export function validateWork(work, now = Date.now()) {
+  assert(work && ['implementation', 'existing-pr'].includes(work.kind) && ['key', 'goal', 'authorizationSource', 'scopeSource'].every(key => typeof work[key] === 'string' && work[key].trim()), 'user goal, authorization source and coordinator scope required');
+  assert(work.mergeAuthorization === null || typeof work.mergeAuthorization === 'string' && work.mergeAuthorization.trim(), 'invalid merge authorization');
+  if (work.kind === 'implementation') assert(work.target === null, 'new work must not impersonate an existing PR');
+  else {
+    const t = work.target;
+    assert(t && Number.isSafeInteger(t.number) && t.number > 0 && t.url === prUrl(t.number) && sha(t.head) && sha(t.base) && ['baseRef', 'headRef', 'source'].every(key => typeof t[key] === 'string' && t[key].trim()) && Array.isArray(t.authors) && t.authors.length && t.authors.every(id => typeof id === 'string' && id.trim()) && Number.isSafeInteger(t.observedAt) && t.observedAt <= now, 'exact existing PR and historical author provenance required');
+  }
+  return work;
+}
+export function validateMergeSnapshot(snapshot, state, now = Date.now()) {
+  const d = snapshot, s = state;
+  assert(d && d.number === s.pr.number && d.url === s.pr.url && d.head === s.head && d.base === s.pr.base && d.base === s.ci.base && d.baseRef === 'main' && s.pr.baseRef === 'main' && d.headRef === s.pr.headRef, 'fresh PR identity and base required');
+  assert(d.state === 'OPEN' && d.draft === false && d.mergeable === true && d.unresolved === 0 && ['APPROVED', null].includes(d.reviewDecision) && d.source?.trim() && fresh(d.observedAt, now), 'merge readiness unavailable or stale');
+  const platform = d.requiredChecks;
+  assert(platform && Object.keys(platform).sort().join() === 'names,observedAt,source' && Array.isArray(platform.names) && platform.names.every(name => typeof name === 'string' && name.trim()) && new Set(platform.names).size === platform.names.length && platform.source?.trim() && fresh(platform.observedAt, now), 'fresh platform required checks observation required');
+  const required = new Set([...PROJECT_CHECKS, ...platform.names]);
+  assert(d.run === s.ci.run && d.ciMergeSha === s.ci.mergeSha && d.checksComplete === true && Array.isArray(d.checks) && [...required].every(name => d.checks.some(c => c.name === name && c.conclusion === 'success' && [s.head, s.ci.mergeSha].includes(c.head) && c.source?.trim())) && d.checks.every(c => ['success', 'neutral', 'skipped'].includes(c.conclusion)), 'current complete checks required');
+  assert(s.review?.head === s.head && s.review.base === d.base && d.acceptance?.head === s.head && d.acceptance.base === d.base && d.acceptance.passed === true && d.acceptance.evidence?.trim(), 'current base acceptance required');
+  return d;
+}
+function stopped(s) {
+  return s.stopEvidence && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true && s.stopEvidence.commandIds.includes(c.id) && s.stopEvidence.at >= c.exit.ended) && s.actors.every(a => a.stopped && s.stopEvidence.observations.some(o => o.id === a.id && o.observedAt >= a.lastActivity && s.commands.filter(c => c.actor === a.id).every(c => o.observedAt >= c.exit.ended)));
+}
 async function location(cwd) {
   cwd = await realpath(cwd);
   const common = await realpath(resolve(cwd, await git(cwd, 'rev-parse', '--git-common-dir')));
@@ -25,48 +54,61 @@ async function atomic(path, data) {
   const directory = await open(dirname(path), 'r'); try { await directory.sync(); } finally { await directory.close(); }
 }
 function valid(s) {
-  assert(s && [1, 2].includes(s.version) && typeof s.epoch === 'string' && Number.isSafeInteger(s.revision) && s.revision >= 0 && Array.isArray(s.authors) && Array.isArray(s.actors) && s.operations && Number.isFinite(s.deadline) && ['ACTIVE','SEALED','REVIEWED','PR','CI','STOPPING','QUIESCENT','RELEASED','BLOCKED_UNCERTAIN','CANCELLED_RELEASED'].includes(s.phase), 'invalid lifecycle state');
+  assert(s && [1, 2, 3].includes(s.version) && typeof s.epoch === 'string' && Number.isSafeInteger(s.revision) && s.revision >= 0 && Array.isArray(s.authors) && Array.isArray(s.actors) && s.operations && Number.isFinite(s.deadline) && ['ACTIVE','SEALED','REVIEWED','PR','CI','STOPPING','QUIESCENT','RELEASED','BLOCKED_UNCERTAIN','CANCELLED_RELEASED','MERGING','MERGED','DEPLOYED'].includes(s.phase), 'invalid lifecycle state');
   const keys = 'version epoch revision phase issue authorization owner cwd branch base head paths deadline coordinator actors authors operations repair review pr ci commands stopEvidence progress stagnant mutation definitions'.split(' ').sort();
-  if (s.version === 2) keys.push('cancellation');
+  if (s.version >= 2) keys.push('cancellation');
+  if (s.version === 3) keys.push('work', 'shipping');
   keys.sort();
   assert(Object.keys(s).sort().join() === keys.join(), 'unknown state fields');
-  assert(Number.isSafeInteger(s.issue) && s.issue > 0 && [s.authorization,s.owner,s.cwd,s.branch].every(x => typeof x === 'string' && x.length) && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(s.base) && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(s.head) && /^[a-f0-9]{64}$/.test(s.coordinator), 'invalid state metadata');
+  assert((s.version === 3 ? issue(s.issue) : Number.isSafeInteger(s.issue) && s.issue > 0) && [s.authorization,s.owner,s.cwd,s.branch].every(x => typeof x === 'string' && x.length) && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(s.base) && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(s.head) && /^[a-f0-9]{64}$/.test(s.coordinator), 'invalid state metadata');
   assert(Array.isArray(s.paths) && s.paths.length && s.paths.every(x => typeof x === 'string') && Array.isArray(s.commands) && s.authors.every(x => typeof x === 'string') && Number.isSafeInteger(s.repair) && s.repair >= 0 && s.repair <= 2 && Number.isSafeInteger(s.stagnant) && s.stagnant >= 0 && s.stagnant <= 2, 'invalid state collections');
   for (const a of s.actors) assert(Object.keys(a).sort().join() === 'capability,id,intent,lastActivity,role,stopped,worktree' && ['writer','reviewer'].includes(a.role) && typeof a.intent === 'string' && (a.id === null || typeof a.id === 'string') && (a.capability === null || /^[a-f0-9]{64}$/.test(a.capability)) && typeof a.stopped === 'boolean' && Number.isFinite(a.lastActivity) && (a.worktree === null || typeof a.worktree === 'string'), 'invalid actor schema');
   assert(s.actors.filter(a => a.role === 'writer' && !a.stopped).length <= 1, 'multiple writers');
   assert(s.operations && Object.getPrototypeOf(s.operations) === Object.prototype && !Array.isArray(s.operations), 'invalid operations');
   for (const op of Object.values(s.operations)) assert(op && Object.keys(op).sort().join() === 'payload,result' && /^[a-f0-9]{64}$/.test(op.payload) && op.result?.epoch === s.epoch && Number.isSafeInteger(op.result.revision), 'invalid operation record');
-  for (const c of s.commands) assert(c && Object.keys(c).sort().join() === (s.version === 2 ? 'actor,exit,id,identity,label,nonce,result,status' : 'actor,exit,id,identity,label,nonce,status') && typeof c.id === 'string' && typeof c.actor === 'string' && typeof c.nonce === 'string' && ['verify','commit'].includes(c.label) && ['PENDING','EXITED','UNCERTAIN'].includes(c.status), 'invalid command record');
+  for (const c of s.commands) assert(c && Object.keys(c).sort().join() === (s.version >= 2 ? 'actor,exit,id,identity,label,nonce,result,status' : 'actor,exit,id,identity,label,nonce,status') && typeof c.id === 'string' && typeof c.actor === 'string' && typeof c.nonce === 'string' && ['verify','commit'].includes(c.label) && ['PENDING','EXITED','UNCERTAIN'].includes(c.status), 'invalid command record');
   assert(s.definitions && Object.keys(s.definitions).sort().join() === 'environment,git,node,npm' && s.definitions.node === process.execPath && s.definitions.git === '/usr/bin/git' && typeof s.definitions.npm === 'string' && JSON.stringify(s.definitions.environment) === JSON.stringify(environment), 'invalid command definitions');
   assert(s.stopEvidence === null || s.stopEvidence && Object.keys(s.stopEvidence).sort().join() === 'at,commandIds,observations' && Array.isArray(s.stopEvidence.observations) && Array.isArray(s.stopEvidence.commandIds) && Number.isFinite(s.stopEvidence.at), 'invalid stop evidence');
   for (const c of s.commands) {
-    if (s.version === 2) assert(c.result === null || c.result && c.status === 'EXITED' && c.exit?.code === 0 && c.result.epoch === s.epoch && c.result.actor === c.actor && c.result.operation === c.id && Number.isFinite(c.result.at) && c.result.at >= c.exit.ended && /^[a-f0-9]{40}$/.test(c.result.head) && /^[a-f0-9]{40}$/.test(c.result.tree) && Array.isArray(c.result.parents) && Array.isArray(c.result.paths), 'invalid supervisor result');
+    if (s.version >= 2) assert(c.result === null || c.result && c.status === 'EXITED' && c.exit?.code === 0 && c.result.epoch === s.epoch && c.result.actor === c.actor && c.result.operation === c.id && Number.isFinite(c.result.at) && c.result.at >= c.exit.ended && /^[a-f0-9]{40}$/.test(c.result.head) && /^[a-f0-9]{40}$/.test(c.result.tree) && Array.isArray(c.result.parents) && Array.isArray(c.result.paths), 'invalid supervisor result');
     assert(c.identity === null || c.identity && Object.keys(c.identity).sort().join() === 'head,pid,started,supervisor' && Number.isInteger(c.identity.pid) && Number.isFinite(c.identity.started) && Number.isInteger(c.identity.supervisor), 'invalid process identity');
     assert(c.status !== 'EXITED' || c.identity && c.exit && c.exit.pid === c.identity.pid && c.exit.started === c.identity.started && c.exit.groupGone === true && Number.isFinite(c.exit.ended) && c.exit.ended >= c.exit.started, 'invalid exit evidence');
   }
   assert(s.mutation === null || s.mutation && Object.keys(s.mutation).sort().join() === 'contentHash,operation,path,status' && s.mutation.status === 'PENDING' && typeof s.mutation.operation === 'string' && s.paths.includes(s.mutation.path) && /^[a-f0-9]{64}$/.test(s.mutation.contentHash), 'invalid mutation state');
-  assert(s.review === null || s.review && Object.keys(s.review).sort().join() === 'actor,evidence,head,passed' && s.review.head === s.head && s.review.passed === true && typeof s.review.evidence === 'string' && s.actors.some(a => a.id === s.review.actor && a.role === 'reviewer') && !s.authors.includes(s.review.actor), 'invalid review evidence');
-  assert(s.pr === null || s.pr && Object.keys(s.pr).sort().join() === 'draft,head,url' && s.pr.head === s.head && s.pr.draft === true && typeof s.pr.url === 'string', 'invalid PR evidence');
-  assert(s.ci === null || s.ci && Object.keys(s.ci).sort().join() === 'head,mergeSha,passed,run' && s.ci.head === s.head && s.ci.passed === true && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(s.ci.mergeSha) && typeof s.ci.run === 'string', 'invalid CI evidence');
+  assert(s.review === null || s.review && Object.keys(s.review).sort().join() === (s.version === 3 ? 'actor,base,evidence,head,passed' : 'actor,evidence,head,passed') && s.review.head === s.head && s.review.passed === true && typeof s.review.evidence === 'string' && s.actors.some(a => a.id === s.review.actor && a.role === 'reviewer') && !s.authors.includes(s.review.actor), 'invalid review evidence');
+  assert(s.pr === null || s.pr && Object.keys(s.pr).sort().join() === (s.version === 3 ? 'base,baseRef,draft,head,headRef,number,observedAt,source,url' : 'draft,head,url') && s.pr.head === s.head && (s.version === 3 ? typeof s.pr.draft === 'boolean' : s.pr.draft === true) && typeof s.pr.url === 'string', 'invalid PR evidence');
+  assert(s.ci === null || s.ci && Object.keys(s.ci).sort().join() === (s.version === 3 ? 'base,head,mergeSha,observedAt,passed,run,source' : 'head,mergeSha,passed,run') && s.ci.head === s.head && s.ci.passed === true && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(s.ci.mergeSha) && typeof s.ci.run === 'string', 'invalid CI evidence');
   assert(!['REVIEWED','PR','CI'].includes(s.phase) || s.review, 'missing review state');
   assert(!['PR','CI'].includes(s.phase) || s.pr, 'missing PR state');
   assert(s.phase !== 'CI' || s.ci, 'missing CI state');
-  if (s.version === 2) {
+  if (s.version >= 2) {
     assert((s.phase === 'CANCELLED_RELEASED') === (s.cancellation !== null), 'invalid cancellation state');
     if (s.cancellation) assert(['legacy-audited', 'supervisor-evidence'].includes(s.cancellation.mode) && s.cancellation.binding?.epoch === s.epoch && s.cancellation.binding.head === s.head && s.cancellation.binding.base === s.base && s.cancellation.binding.cwd === s.cwd && Number.isFinite(s.cancellation.at) && typeof s.cancellation.reason === 'string' && s.cancellation.reason.length && /^[a-f0-9]{64}$/.test(s.cancellation.implementationHash), 'invalid cancellation audit');
+  }
+  if (s.version === 3) {
+    validateWork(s.work);
+    assert(s.shipping && Object.keys(s.shipping).sort().join() === 'deployment,intent,result', 'invalid shipping state');
+    if (s.shipping.intent) assert(s.shipping.intent.expected_head_sha === s.head && s.shipping.intent.method === 'merge' && Number.isFinite(s.shipping.intent.at) && s.shipping.intent.at <= s.deadline, 'invalid merge intent');
+    if (s.shipping.result) assert(s.shipping.intent && ['merged','denied','not-merged'].includes(s.shipping.result.outcome) && s.shipping.result.head === s.head && s.shipping.result.source?.trim(), 'invalid merge result');
+    assert(s.phase !== 'MERGING' || s.shipping.intent && s.shipping.result === null, 'missing pending merge');
+    assert(!['MERGED','DEPLOYED'].includes(s.phase) || s.shipping.result?.outcome === 'merged' && sha(s.shipping.result.sha), 'missing actual merge result');
+    assert(s.phase !== 'DEPLOYED' || s.shipping.deployment?.status === 'success', 'missing production result');
   }
   return s;
 }
 export async function acquire(cwd, input) {
   const p = await location(cwd);
-  assert(Number.isSafeInteger(input.issue) && input.issue > 0 && input.authorization?.trim() && input.owner?.trim() && Array.isArray(input.paths) && input.paths.length, 'issue, authorization, owner and paths required');
+  assert((input.work ? issue(input.issue ?? null) : Number.isSafeInteger(input.issue) && input.issue > 0) && input.authorization?.trim() && input.owner?.trim() && Array.isArray(input.paths) && input.paths.length, 'issue, authorization, owner and paths required');
+  if (input.work) validateWork(input.work);
   for (const path of input.paths) await checkedPath(p.cwd, path);
   const timeout = input.timeoutMs ?? 1200000;
   assert(Number.isSafeInteger(timeout) && timeout > 0 && timeout <= 1200000, 'invalid deadline');
+  if (input.work?.kind === 'existing-pr') assert(await git(cwd, 'rev-parse', 'HEAD') === input.work.target.head && !(await git(cwd, 'status', '--porcelain')) && fresh(input.work.target.observedAt, Date.now()), 'existing PR checkout or observation changed');
   await mkdir(p.root, { recursive: true });
   await mkdir(p.lock); // Existing/creating/crashed locks are never reclaimed.
   const token = randomUUID();
-  const s = { version: 2, cancellation: null, epoch: randomUUID(), revision: 0, phase: 'ACTIVE', issue: input.issue, authorization: input.authorization, owner: input.owner, cwd: p.cwd, branch: await git(cwd, 'branch', '--show-current'), base: await git(cwd, 'rev-parse', 'HEAD'), head: await git(cwd, 'rev-parse', 'HEAD'), paths: input.paths, mutation: null, definitions: { node: process.execPath, git: '/usr/bin/git', npm: await realpath(join(dirname(process.execPath), 'npm')), environment }, commands: [], stopEvidence: null, progress: null, stagnant: 0, deadline: Date.now() + timeout, coordinator: digest(token), actors: [], authors: [], operations: {}, repair: 0, review: null, pr: null, ci: null };
+  const s = { version: input.work ? 3 : 2, ...(input.work ? { work: input.work, shipping: { intent: null, result: null, deployment: null } } : {}), cancellation: null, epoch: randomUUID(), revision: 0, phase: input.work?.kind === 'existing-pr' ? 'SEALED' : 'ACTIVE', issue: input.issue ?? null, authorization: input.authorization, owner: input.owner, cwd: p.cwd, branch: await git(cwd, 'branch', '--show-current'), base: await git(cwd, 'rev-parse', 'HEAD'), head: await git(cwd, 'rev-parse', 'HEAD'), paths: input.paths, mutation: null, definitions: { node: process.execPath, git: '/usr/bin/git', npm: await realpath(join(dirname(process.execPath), 'npm')), environment }, commands: [], stopEvidence: null, progress: null, stagnant: 0, deadline: Date.now() + timeout, coordinator: digest(token), actors: [], authors: input.work?.target?.authors ?? [], operations: {}, repair: 0, review: null, pr: null, ci: null };
+  valid(s);
   await atomic(join(p.lock, 'state.json'), s);
   return { epoch: s.epoch, revision: 0, token };
 }
@@ -120,17 +162,18 @@ export async function transition(cwd, request, internal = null) {
     assert(s.phase !== 'CANCELLED_RELEASED', 'cancelled terminal state');
     assert(request.expected_revision === s.revision, 'revision conflict');
     const d = request.data ?? {};
-    if (Date.now() >= s.deadline && !['request-stop','confirm-quiescent','revoke-actor','cancel-release','release','command-exit'].includes(request.action)) {
+    if (s.version === 3 && s.shipping.intent && !['record-merge', 'record-deployment', 'release'].includes(request.action)) throw Error('shipping outcome must be reconciled; lock retained');
+    if (Date.now() >= s.deadline && !['request-stop','confirm-quiescent','revoke-actor','cancel-release','release','command-exit','record-merge','record-deployment'].includes(request.action)) {
       s.phase = 'STOPPING'; s.revision++; await atomic(join(p.lock, 'state.json'), s); throw Error('deadline reached; lock retained');
     }
-    if (['record-review','record-pr','record-ci','release'].includes(request.action) && await git(s.cwd, 'rev-parse', 'HEAD') !== s.head) {
+    if (['record-review','record-pr','record-ci','merge-intent','record-merge','record-deployment','release'].includes(request.action) && await git(s.cwd, 'rev-parse', 'HEAD') !== s.head) {
       s.review = s.ci = null; s.phase = 'BLOCKED_UNCERTAIN'; s.revision++;
       await atomic(join(p.lock, 'state.json'), s); throw Error('head changed; evidence invalidated');
     }
     const needCoordinator = () => assert(coordinator, 'coordinator required');
     switch (request.action) {
       case 'dispatch-intent':
-        needCoordinator(); assert((d.role === 'writer' && s.phase === 'ACTIVE' || d.role === 'reviewer' && s.phase === 'SEALED') && !s.actors.some(a => !a.stopped), 'invalid dispatch or active actor');
+        needCoordinator(); assert((d.role === 'writer' && s.phase === 'ACTIVE' && (s.version !== 3 || s.work.allowPublish === true) || d.role === 'reviewer' && s.phase === 'SEALED') && !s.actors.some(a => !a.stopped), 'invalid dispatch or active actor');
         s.actors.push({ intent: randomUUID(), role: d.role, id: null, capability: null, stopped: false, worktree: null, lastActivity: Date.now() }); break;
       case 'bind-actor': {
         needCoordinator(); const a = s.actors.find(a => a.intent === d.intent);
@@ -154,7 +197,7 @@ export async function transition(cwd, request, internal = null) {
       }
       case 'command-intent':
         assert(actor && !actor.stopped && (actor.role === 'writer' && s.phase === 'ACTIVE' && ['verify','commit'].includes(d.label) || actor.role === 'reviewer' && s.phase === 'SEALED' && d.label === 'verify') && typeof d.nonce === 'string' && !s.commands.some(c => c.status !== 'EXITED'), 'command forbidden');
-        s.commands.push({ id: request.operation_id, actor: actor.id, label: d.label, nonce: d.nonce, status: 'PENDING', identity: null, exit: null, ...(s.version === 2 ? { result: null } : {}) }); break;
+        s.commands.push({ id: request.operation_id, actor: actor.id, label: d.label, nonce: d.nonce, status: 'PENDING', identity: null, exit: null, ...(s.version >= 2 ? { result: null } : {}) }); break;
       case 'command-start': {
         const c = s.commands.find(c => c.id === d.id);
         assert(c?.status === 'PENDING' && !c.identity && !actor.stopped && ['ACTIVE','SEALED'].includes(s.phase), 'spawn stopped or uncertain');
@@ -166,7 +209,7 @@ export async function transition(cwd, request, internal = null) {
         const c = s.commands.find(c => c.id === d.id);
         assert(actor && c?.actor === actor.id && c.status === 'PENDING' && c.nonce === d.nonce && c.identity?.pid === d.evidence?.pid && c.identity?.started === d.evidence?.started && d.evidence && typeof d.evidence.started === 'number' && typeof d.evidence.pid === 'number', 'command ownership evidence required');
         c.status = d.evidence.groupGone === true && (Number.isInteger(d.evidence.code) || typeof d.evidence.signal === 'string') ? 'EXITED' : 'UNCERTAIN'; c.exit = d.evidence;
-        if (s.version === 2 && c.status === 'EXITED' && c.exit.code === 0) {
+        if (s.version >= 2 && c.status === 'EXITED' && c.exit.code === 0) {
           const head = await git(p.cwd, 'rev-parse', 'HEAD');
           const tree = await git(p.cwd, 'rev-parse', 'HEAD^{tree}');
           const parents = (await git(p.cwd, 'show', '-s', '--format=%P', head)).split(' ').filter(Boolean);
@@ -178,13 +221,13 @@ export async function transition(cwd, request, internal = null) {
         if (c.status === 'UNCERTAIN') s.phase = 'BLOCKED_UNCERTAIN'; break;
       }
       case 'repair':
-        needCoordinator(); assert(['SEALED','REVIEWED','PR','CI'].includes(s.phase) && s.actors.every(a => a.stopped) && s.repair < 2 && s.stagnant < 2 && d.evidence?.trim(), 'repair budget or actor gate');
+        needCoordinator(); assert((s.version !== 3 || s.work.allowPublish === true) && ['SEALED','REVIEWED','PR','CI'].includes(s.phase) && stopped(s) && s.repair < 2 && s.stagnant < 2 && d.evidence?.trim(), 'repair budget or actor gate');
         s.stagnant = s.progress === d.evidence ? s.stagnant + 1 : 1; s.progress = d.evidence; s.repair++;
         s.review = s.pr = s.ci = null; s.phase = s.stagnant >= 2 ? 'BLOCKED_UNCERTAIN' : 'ACTIVE'; break;
       case 'request-stop': needCoordinator(); s.phase = 'STOPPING'; break;
       case 'confirm-quiescent':
         needCoordinator(); assert(Array.isArray(d.observations) && d.observations.length === s.actors.length && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true) && s.actors.every(a => a.id && d.observations.some(o => o.id === a.id && o.status === 'stop-acknowledged' && o.noExternalProcesses === true && typeof o.source === 'string' && o.source.length > 0 && Number.isFinite(o.observedAt) && o.observedAt >= a.lastActivity && o.observedAt <= Date.now())), 'positive actor stop evidence required');
-        s.actors.forEach(a => { a.stopped = true; }); s.stopEvidence = { observations: d.observations, commandIds: s.commands.map(c => c.id), at: Date.now() }; if (!['SEALED','REVIEWED','PR','CI'].includes(s.phase)) s.phase = 'QUIESCENT'; break;
+        s.actors.forEach(a => { a.stopped = true; }); s.stopEvidence = { observations: d.observations, commandIds: s.commands.map(c => c.id), at: Date.now() }; if (!['SEALED','REVIEWED','PR','CI','MERGING','MERGED','DEPLOYED'].includes(s.phase)) s.phase = 'QUIESCENT'; break;
       case 'cancel-release': {
         needCoordinator();
         assert(s.phase === 'QUIESCENT' && s.stopEvidence && s.actors.every(a => a.id && a.stopped && a.capability === null), 'all actors must be stopped and revoked');
@@ -196,7 +239,7 @@ export async function transition(cwd, request, internal = null) {
         const tree = await git(p.cwd, 'rev-parse', 'HEAD^{tree}');
         const parents = (await git(p.cwd, 'show', '-s', '--format=%P', observedHead)).split(' ').filter(Boolean);
         assert(binding.observedHead === observedHead && binding.tree === tree && JSON.stringify(binding.parents) === JSON.stringify(parents) && await git(p.cwd, 'branch', '--show-current') === s.branch && !(await git(p.cwd, 'status', '--porcelain')), 'cancellation repository drift');
-        if (s.version === 2) {
+        if (s.version >= 2) {
           let expectedHead = s.base;
           let expectedTree = await git(p.cwd, 'rev-parse', `${s.base}^{tree}`);
           for (const command of s.commands) {
@@ -219,7 +262,7 @@ export async function transition(cwd, request, internal = null) {
           const paths = (await git(p.cwd, 'diff-tree', '--no-commit-id', '--name-only', '-r', head)).split('\n').filter(Boolean);
           assert(lineage.length === 1 && paths.every(path => s.paths.includes(path)), 'cancellation history outside scope');
           const commitTree = await git(p.cwd, 'rev-parse', `${head}^{tree}`);
-          if (s.version === 2) assert(s.commands.some(c => c.label === 'commit' && c.result?.head === head && c.result.epoch === s.epoch && c.result.operation === c.id && c.result.actor === c.actor && c.result.parents[0] === lineage[0] && c.result.tree === commitTree), 'missing supervisor commit result');
+          if (s.version >= 2) assert(s.commands.some(c => c.label === 'commit' && c.result?.head === head && c.result.epoch === s.epoch && c.result.operation === c.id && c.result.actor === c.actor && c.result.parents[0] === lineage[0] && c.result.tree === commitTree), 'missing supervisor commit result');
         }
         assert(typeof d.reason === 'string' && d.reason.trim() && typeof d.codeVersion === 'string' && /^[a-f0-9]{40}$/.test(d.codeVersion), 'cancellation reason and code version required');
         const legacy = s.version === 1;
@@ -242,16 +285,41 @@ export async function transition(cwd, request, internal = null) {
       }
       case 'seal-writer':
         needCoordinator(); assert(s.phase === 'QUIESCENT' && !(await git(cwd, 'status', '--porcelain')), 'clean quiescent worktree required');
-        s.head = await git(cwd, 'rev-parse', 'HEAD'); s.phase = 'SEALED'; break;
+        if (s.version === 3) assert(stopped(s) && s.commands.some(c => c.label === 'commit' && c.result !== null && c.exit?.code === 0), 'managed writer commit required');
+        s.head = await git(cwd, 'rev-parse', 'HEAD');
+        if (s.version === 3) assert(s.commands.some(c => c.label === 'commit' && c.result?.head === s.head), 'current managed commit required');
+        s.phase = 'SEALED'; break;
       case 'record-review':
         assert(actor?.role === 'reviewer' && !actor.stopped && !s.authors.includes(actor.id) && s.phase === 'SEALED' && d.head === s.head && d.evidence?.trim() && d.passed === true, 'independent review required');
+        if (s.version === 3) assert(sha(d.base) && (!s.work.target || d.base === s.work.target.base), 'review base binding required');
         assert(await git(p.cwd, 'rev-parse', 'HEAD') === s.head && !(await git(p.cwd, 'status', '--porcelain')) && s.commands.every(c => c.status === 'EXITED') && ((c) => c?.status === 'EXITED' && c.exit.code === 0 && c.identity.head === s.head)(s.commands.findLast(c => c.actor === actor.id && c.label === 'verify')), 'clean current reviewer verify required'); s.review = { ...d, actor: actor.id }; s.phase = 'REVIEWED'; break;
       case 'record-pr':
-        needCoordinator(); assert(s.phase === 'REVIEWED' && d.draft === true && d.head === s.head && d.url?.startsWith('https://github.com/'), 'reviewed draft required'); s.pr = d; s.phase = 'PR'; break;
+        needCoordinator(); assert(s.phase === 'REVIEWED' && (s.version === 3 && s.work.kind === 'existing-pr' ? typeof d.draft === 'boolean' : d.draft === true) && d.head === s.head && d.url?.startsWith('https://github.com/'), 'reviewed PR required');
+        if (s.version === 3) assert(d.url === prUrl(d.number) && d.base === s.review.base && d.baseRef?.trim() && d.headRef?.trim() && d.source?.trim() && fresh(d.observedAt, Date.now()) && (!s.work.target || d.url === s.work.target.url && d.base === s.work.target.base && d.headRef === s.work.target.headRef), 'exact fresh PR binding required');
+        s.pr = d; s.phase = 'PR'; break;
       case 'record-ci':
-        needCoordinator(); assert(s.phase === 'PR' && d.head === s.head && d.mergeSha && d.run && d.passed === true, 'current CI required'); s.ci = d; s.phase = 'CI'; break;
+        needCoordinator(); assert(s.phase === 'PR' && d.head === s.head && d.mergeSha && d.run && d.passed === true, 'current CI required');
+        if (s.version === 3) assert(d.base === s.pr.base && d.source?.trim() && fresh(d.observedAt, Date.now()), 'fresh CI base required');
+        s.ci = d; s.phase = 'CI'; break;
+      case 'merge-intent':
+        needCoordinator(); assert(s.version === 3 && s.phase === 'CI' && s.work.mergeAuthorization && stopped(s) && !s.shipping.intent, 'authorized stopped merge gate required');
+        validateMergeSnapshot(d, s);
+        s.shipping.intent = { expected_head_sha: s.head, method: 'merge', at: Date.now(), snapshot: d };
+        s.pr.draft = false; s.phase = 'MERGING'; break;
+      case 'record-merge':
+        needCoordinator(); assert(s.version === 3 && s.phase === 'MERGING' && ['merged','denied','not-merged'].includes(d.outcome) && d.head === s.head && d.base === s.pr.base && d.url === s.pr.url && d.source?.trim() && fresh(d.observedAt, Date.now()) && d.observedAt >= s.shipping.intent.at, 'official merge outcome required');
+        assert(d.outcome === 'merged' ? sha(d.sha) && d.parents?.length === 2 && d.parents[0] === s.pr.base && d.parents[1] === s.head : d.sha === null, 'ordinary merge parents or explicit non-merge required');
+        s.shipping.result = d; s.phase = d.outcome === 'merged' ? 'MERGED' : 'CI'; break;
+      case 'record-deployment':
+        needCoordinator(); assert(s.version === 3 && s.phase === 'MERGED' && d.sha === s.shipping.result.sha && d.environment === 'production' && ['pending','failure','success'].includes(d.status) && d.provider?.trim() && d.id?.trim() && d.url?.trim() && d.source?.trim() && fresh(d.observedAt, Date.now()) && d.observedAt >= s.shipping.result.observedAt, 'actual merged SHA production observation required');
+        if (d.status === 'success') assert(d.build === 'success' && d.regression?.passed === true && d.regression.sha === d.sha && d.regression.environment === 'production' && d.regression.source?.trim() && d.regression.observedAt >= s.shipping.result.observedAt && d.regression.observedAt <= d.observedAt, 'production build and live regression required');
+        s.shipping.deployment = d;
+        if (d.status === 'success') s.phase = 'DEPLOYED'; break;
       case 'release':
-        needCoordinator(); assert(['CI','QUIESCENT'].includes(s.phase) && s.stopEvidence && s.commands.every(c => c.status === 'EXITED' && c.exit?.groupGone === true && s.stopEvidence.commandIds.includes(c.id)) && s.actors.every(a => a.stopped && s.stopEvidence.observations.some(o => o.id === a.id)) && await git(cwd, 'rev-parse', 'HEAD') === s.head, 'release evidence missing'); s.phase = 'RELEASED'; break;
+        needCoordinator();
+        assert((s.version === 3 ? ['CI','MERGED','DEPLOYED'].includes(s.phase) : ['CI','QUIESCENT'].includes(s.phase)) && stopped(s) && await git(cwd, 'rev-parse', 'HEAD') === s.head, 'release evidence missing');
+        if (s.version === 3) assert(s.review && s.pr && s.ci && (!s.shipping.intent || s.shipping.result), 'pending outcome retains lock');
+        s.phase = 'RELEASED'; break;
       default: throw Error('unsupported action');
     }
     s.revision++;

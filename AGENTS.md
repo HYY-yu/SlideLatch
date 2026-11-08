@@ -6,11 +6,12 @@
 
 - 非简单任务先用 pstack:poteto-mode 设计、实现、实测。若运行环境未加载 pstack，读取本地已安装 Skill；不可声称未执行的流程已完成。
 - 先读 docs/team-workflow.md 和 docs/loop-a-backlog.md，再按 .codex/agents/ 的职责分派。
-- 每个工作项一个 owner。每名写入者用独立 worktree、分支和 draft PR，不覆盖其他写入者或用户的未提交文件。
+- 每个工作项一个 owner。每名写入者用独立 worktree 和分支。新工作创建 draft PR，已有 PR 修复复用原 PR，不覆盖其他写入者或用户的未提交文件。
 - 设计先说明输入、输出、不变量、失败状态和验收。修改行为时同步回归测试。
 - 提交交付前运行 npm run verify。领域验收按 .agents/skills/verify-slidelatch/SKILL.md，不能以 CI 绿灯代替浏览器或 PowerPoint 原生检查。
 - 非作者 verifier 验收精确 head SHA。新提交使旧结论失效；集成人员重新读取远程 SHA、CI 和验收。
-- 当前不授权合并、auto-merge、生产部署、分支保护、凭据或权限调整、后台调度。需要这些操作时另行确认，不以沉默或绿色 CI 代替授权。
+- 唯一开发入口是 .agents/skills/slidelatch-loop-once/SKILL.md。优先推进已有 PR，Issue 用于可选沟通；coordinator 从已授权目标生成精确 scope，不要求用户逐项填路径。
+- 用户允许通过独立验收的 PR 普通合并，正常 main 合并可以触发部署。每轮核实当前授权、head/base、CI 与未决审查，记录真实 merge SHA 和对应 production 结果。权限、凭据、分支保护、新服务或后台调度仍需相应授权，不能把绿灯当授权。
 - 不为了通过检查删除关键测试、降低门槛或将失败改为跳过。重大合同、数据路径、成本、依赖和保真范围变更须人类决定。
 
 ## 产品与数据边界
