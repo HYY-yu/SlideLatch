@@ -1,5 +1,6 @@
-import { realpath, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { realpath, readFile, writeFile, mkdir, open } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { checkedPath, acquire, inspect, transition } from './loop-a-lifecycle.mjs';
@@ -37,10 +38,28 @@ export async function admit(p, cap) {
   await transition(p.worktree, { ...cap, expected_revision: stopped.revision, operation_id: 'admission-cancel', action: 'cancel-release', data: { binding, mode: 'supervisor-evidence', reason: 'admission deadline exceeded before dispatch', codeVersion: p.entrySha } });
   throw Error('BLOCKED_DEADLINE: empty lease cancelled before dispatch');
 }
+async function invocationRegistry(worktree, invocationId) {
+  requireValue(typeof worktree === 'string' && typeof invocationId === 'string' && invocationId.length, 'worktree and invocation identity required');
+  const cwd = await realpath(worktree);
+  const common = await realpath(resolve(cwd, git(cwd, 'rev-parse', '--git-common-dir')));
+  const directory = join(common, 'loop-a-invocations');
+  return { common, directory, file: join(directory, createHash('sha256').update(invocationId).digest('hex') + '.json') };
+}
 export async function beginInvocation(file, input = {}, now = Date.now()) {
+  const registry = await invocationRegistry(input.worktree, input.invocationId);
   const startedAt = input.startedAt ?? now;
-  requireValue(Number.isSafeInteger(startedAt) && startedAt <= now && now < startedAt + 1200000 && typeof input.invocationId === 'string' && input.invocationId.length, 'valid invocation identity and original start required');
-  const record = { version: 1, invocationId: input.invocationId, startedAt, recordedAt: now, timingSource: input.startedAt === undefined ? 'first-observable-entry' : 'caller-attested-dispatch-time' };
+  requireValue(Number.isSafeInteger(startedAt) && startedAt <= now && now < startedAt + 1200000, 'valid original start required');
+  const proposed = { version: 1, invocationId: input.invocationId, common: registry.common, startedAt, recordedAt: now, timingSource: input.startedAt === undefined ? 'first-observable-entry' : 'caller-attested-dispatch-time' };
+  await mkdir(registry.directory, { recursive: true });
+  try {
+    const handle = await open(registry.file, 'wx', 0o600);
+    try { await handle.writeFile(JSON.stringify(proposed)); await handle.sync(); } finally { await handle.close(); }
+    const directory = await open(registry.directory, 'r');
+    try { await directory.sync(); } finally { await directory.close(); }
+  }
+  catch (error) { if (error.code !== 'EEXIST') throw error; }
+  const record = JSON.parse(await readFile(registry.file, 'utf8'));
+  requireValue(record.version === 1 && record.invocationId === input.invocationId && record.common === registry.common && (input.startedAt === undefined || record.startedAt === input.startedAt) && now < record.startedAt + 1200000, 'invocation start cannot be reset');
   await writeFile(file, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
   return record;
 }
@@ -48,6 +67,8 @@ export async function acquireOnce(input, capabilityFile) {
   requireValue(typeof input.invocationRecord === 'string', 'immutable invocation record required');
   const invocation = JSON.parse(await readFile(input.invocationRecord, 'utf8'));
   requireValue(invocation.version === 1 && invocation.invocationId === input.invocationId && invocation.startedAt === input.startedAt && invocation.recordedAt >= invocation.startedAt && invocation.recordedAt <= Date.now(), 'invocation budget mismatch');
+  const registry = await invocationRegistry(input.worktree, input.invocationId);
+  requireValue(JSON.stringify(invocation) === await readFile(registry.file, 'utf8'), 'invocation registry mismatch');
   const p = await prepare(input);
   const timeoutMs = p.deadline - Date.now() - 1000;
   requireValue(timeoutMs > 0, 'insufficient remaining deadline');

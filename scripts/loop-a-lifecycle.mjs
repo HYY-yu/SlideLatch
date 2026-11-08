@@ -196,6 +196,22 @@ export async function transition(cwd, request, internal = null) {
         const tree = await git(p.cwd, 'rev-parse', 'HEAD^{tree}');
         const parents = (await git(p.cwd, 'show', '-s', '--format=%P', observedHead)).split(' ').filter(Boolean);
         assert(binding.observedHead === observedHead && binding.tree === tree && JSON.stringify(binding.parents) === JSON.stringify(parents) && await git(p.cwd, 'branch', '--show-current') === s.branch && !(await git(p.cwd, 'status', '--porcelain')), 'cancellation repository drift');
+        if (s.version === 2) {
+          let expectedHead = s.base;
+          let expectedTree = await git(p.cwd, 'rev-parse', `${s.base}^{tree}`);
+          for (const command of s.commands) {
+            assert(command.identity.head === expectedHead, 'supervisor history drift');
+            if (command.exit.code !== 0) continue;
+            const result = command.result;
+            assert(result && result.epoch === s.epoch && result.actor === command.actor && result.operation === command.id, 'missing supervisor command result');
+            if (command.label === 'commit') {
+              assert(result.parents.length === 1 && result.parents[0] === expectedHead, 'supervisor commit chain drift');
+              expectedHead = result.head;
+              expectedTree = result.tree;
+            } else assert(result.head === expectedHead && result.tree === expectedTree, 'supervisor verify drift');
+          }
+          assert(observedHead === expectedHead && tree === expectedTree, 'observed head differs from final supervisor result');
+        }
         const commits = (await git(p.cwd, 'rev-list', `${s.base}..${observedHead}`)).split('\n').filter(Boolean);
         assert(await git(p.cwd, 'merge-base', s.base, observedHead) === s.base, 'cancellation base drift');
         for (const head of commits) {

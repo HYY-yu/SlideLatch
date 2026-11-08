@@ -7,7 +7,7 @@ description: Explicitly invoke one authorized SlideLatch Loop A round in a host 
 
 You are the coordinator for this invocation. Do not delegate the overall coordination or return merely because a child finishes. This skill needs actual host collaboration.spawn_agent, followup_task, send_message, list_agents and interrupt_agent. If unavailable, report BLOCKED_HOST before acquiring. No local Codex binary, shell imitation, or CLI thread ID is a native actor.
 
-Before reading further task documents, record this invocation with the frozen helper begin command and an exclusive external record file. Prefer the caller-provided real dispatch startedAt; never replace it with a later timestamp. Without a caller timestamp the budget starts at the first observable entry record, not before skill reading. Pass invocationRecord and invocationId to acquire. This is a cooperative record, not tamper-proof OS isolation.
+Before reading further task documents, record this invocation with the frozen helper begin command, target worktree, invocationId and an exclusive external record file. The repository registry preserves that invocationId across output paths. Prefer the caller-provided real dispatch startedAt; never replace it with a later timestamp. Without a caller timestamp the budget starts at the first observable entry record, not before skill reading. Pass invocationRecord and invocationId to acquire. This is a cooperative record, not tamper-proof OS isolation.
 
 Read docs/loop-a-once.md, docs/loop-a-lifecycle.md, docs/team-workflow.md and actual .codex/agents role instructions. Reading roles does not mean the host loaded custom roles. Pass relevant instructions explicitly. The presentation workflow skill is unrelated to this orchestration.
 

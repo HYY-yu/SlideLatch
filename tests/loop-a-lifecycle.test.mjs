@@ -304,6 +304,9 @@ test('cancel archives original head and retries without touching successor lease
   await call(cwd, writer, 'write', { path: 'file', content: 'cancelled change' });
   const { managedCommand } = await import('../scripts/loop-a-lifecycle.mjs');
   await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: 'commit', data: { label: 'commit' } });
+  const earlierHead = (await inspect(cwd)).commands.at(-1).result.head;
+  await call(cwd, writer, 'write', { path: 'file', content: 'second cancelled change' });
+  for (const label of ['commit', 'verify']) await managedCommand(cwd, { ...writer, expected_revision: (await inspect(cwd)).revision, operation_id: `second-${label}`, data: { label } });
   await call(cwd, cap, 'request-stop');
   await call(cwd, cap, 'confirm-quiescent', { observations: [{ id: 'writer', status: 'stop-acknowledged', noExternalProcesses: true, source: 'fixture', observedAt: Date.now() }] });
   await call(cwd, cap, 'revoke-actor', { actor: 'writer', reason: 'fixture cancellation' });
@@ -319,8 +322,15 @@ test('cancel archives original head and retries without touching successor lease
   const saved = await readFile(statePath, 'utf8');
   const missing = JSON.parse(saved); missing.commands[0].result = null;
   await writeFile(statePath, JSON.stringify(missing));
-  await assert.rejects(transition(cwd, request), /missing supervisor commit result/);
+  await assert.rejects(transition(cwd, request), /missing supervisor (commit|command) result/);
   await writeFile(statePath, saved);
+  for (const rollbackHead of [original, earlierHead]) {
+  g('reset', '--hard', rollbackHead);
+  const rollback = { ...binding, observedHead: g('rev-parse', 'HEAD'), tree: g('rev-parse', 'HEAD^{tree}'), parents: g('show', '-s', '--format=%P', 'HEAD').split(' ').filter(Boolean) };
+  await assert.rejects(transition(cwd, { ...request, data: { ...request.data, binding: rollback } }), /final supervisor result/);
+  assert.equal(await readFile(statePath, 'utf8'), saved);
+  }
+  g('reset', '--hard', binding.observedHead);
   const controlDirectory = join(root, '.git', 'loop-a');
   await chmod(controlDirectory, 0o500);
   try { await assert.rejects(transition(cwd, request), /EACCES|EPERM/); }

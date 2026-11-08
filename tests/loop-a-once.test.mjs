@@ -43,15 +43,20 @@ test('invocation start is exclusive and preserves caller budget', async () => {
   const { join } = await import('node:path');
   const root = await mkdtemp(join(tmpdir(), 'slidelatch-invocation-'));
   try {
+    const repo = join(root, 'repo');
+    execFileSync('git', ['init', repo], { stdio: 'pipe' });
     const path = join(root, 'invocation.json');
     const now = Date.now();
-    const first = await beginInvocation(path, { invocationId: 'fixture', startedAt: now - 100 }, now);
+    const first = await beginInvocation(path, { worktree: repo, invocationId: 'fixture', startedAt: now - 100 }, now);
     assert.equal(first.startedAt, now - 100);
     assert.equal(first.timingSource, 'caller-attested-dispatch-time');
-    await assert.rejects(beginInvocation(path, { invocationId: 'fixture', startedAt: now }, now), /EEXIST/);
+    await assert.rejects(beginInvocation(path, { worktree: repo, invocationId: 'fixture', startedAt: now - 100 }, now), /EEXIST/);
+    await assert.rejects(beginInvocation(join(root, 'reset.json'), { worktree: repo, invocationId: 'fixture', startedAt: now }, now), /cannot be reset/);
+    const reused = await beginInvocation(join(root, 'retained.json'), { worktree: repo, invocationId: 'fixture' }, now);
+    assert.equal(reused.startedAt, now - 100);
     assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), first);
-    await assert.rejects(beginInvocation(join(root, 'future'), { invocationId: 'fixture', startedAt: now + 1 }, now), /original start/);
-    const fallback = await beginInvocation(join(root, 'fallback'), { invocationId: 'fallback' }, now);
+    await assert.rejects(beginInvocation(join(root, 'future'), { worktree: repo, invocationId: 'fixture', startedAt: now + 1 }, now), /original start/);
+    const fallback = await beginInvocation(join(root, 'fallback'), { worktree: repo, invocationId: 'fallback' }, now);
     assert.equal(fallback.startedAt, now);
     assert.equal(fallback.timingSource, 'first-observable-entry');
   } finally { await rm(root, { recursive: true, force: true }); }
