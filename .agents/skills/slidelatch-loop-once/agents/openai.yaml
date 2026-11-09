@@ -1,5 +1,0 @@
-interface:
-  display_name: "SlideLatch PR-first round"
-  short_description: "Advance authorized PRs and small tasks with independent acceptance"
-policy:
-  allow_implicit_invocation: false
