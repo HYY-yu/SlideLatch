@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as React from 'react';
 import * as jsx from 'react/jsx-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { DOMParser } from '@xmldom/xmldom';
 
 function load(relative, imports = {}) {
   const exports = {};
@@ -65,6 +66,24 @@ for (const locale of i18n.locales) {
 }
 test('unsupported studio locales fail closed', async () => {
   await assert.rejects(route.default({ params: Promise.resolve({ locale: 'fr' }) }), /NOT_FOUND/);
+});
+
+test('both studio canonical URLs appear in the sitemap with reciprocal language alternatives', () => {
+  const xml = readFileSync(new URL('../public/sitemap.xml', import.meta.url), 'utf8');
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const entries = Array.from(doc.getElementsByTagName('url'));
+  for (const locale of ['zh', 'en']) {
+    const entry = entries.find(item => item.getElementsByTagName('loc')[0]?.textContent === `https://slidelatch.app/${locale}/deck-studio`);
+    assert.ok(entry, `${locale} studio canonical URL is discoverable`);
+    const alternatives = Array.from(entry.getElementsByTagNameNS('http://www.w3.org/1999/xhtml', 'link'));
+    assert.deepEqual(alternatives.map(link => [link.getAttribute('hreflang'), link.getAttribute('href')]), [
+      ['zh-CN', 'https://slidelatch.app/zh/deck-studio'],
+      ['en', 'https://slidelatch.app/en/deck-studio'],
+      ['x-default', 'https://slidelatch.app/zh/deck-studio'],
+    ]);
+  }
+  assert.equal(entries.some(item => item.getElementsByTagName('loc')[0]?.textContent === 'https://slidelatch.app/deck-studio'), false);
+  assert.equal(doc.getElementsByTagName('lastmod').length, 0);
 });
 
 const landing = load('components/landing.tsx', {

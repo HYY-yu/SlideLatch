@@ -12,4 +12,16 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://slidelatch.app/en" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://slidelatch.app/zh" />
   </url>
+  <url>
+    <loc>https://slidelatch.app/zh/deck-studio</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://slidelatch.app/zh/deck-studio" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://slidelatch.app/en/deck-studio" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://slidelatch.app/zh/deck-studio" />
+  </url>
+  <url>
+    <loc>https://slidelatch.app/en/deck-studio</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://slidelatch.app/zh/deck-studio" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://slidelatch.app/en/deck-studio" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://slidelatch.app/zh/deck-studio" />
+  </url>
 </urlset>
