@@ -1,13 +1,15 @@
 ---
 name: slidelatch-workflow
-description: Use SlideLatch to mark a user-provided PPTX through the current AI session, load the marked result in Studio for user review, then compile and generate a source-based PPTX after confirmation. Local tools preserve the original design without storing credentials.
+description: Use SlideLatch to mark an existing PPTX, present it in Studio for human acceptance, then compile, select, fill, validate and generate a source-based PPTX through the built-in PPT-DSL runtime. One AI-operated workflow preserves the original design.
 ---
 
 # SlideLatch workflow
 
 PPT-DSL is the underlying contract, not a second product. The source PPTX owns geometry and styling. Use only the user's provided deck unless they explicitly request a public demo. This skill does not grant permission to send documents to a new provider, spend money, install software, deploy, or publish.
 
-The AI owns preparation, semantic marking and loading the result. Studio is the user's review surface for an already marked PPTX. Do not make the user export an AI request, move proposal JSON between tools, or run the marking commands themselves.
+The AI owns preparation, semantic marking, loading, compilation, page selection, content filling and generation. Studio is the user's review surface for an already marked PPTX. Do not make the user move JSON between tools, replace final-deck pages, bind technical fields or run commands. The unified entry is this skill; a separate PPT-DSL skill is not required.
+
+Run commands from the SlideLatch repository root with its existing locked dependencies. Use `packages/ppt-dsl`, not a copied runtime from another skill. This repository-backed skill is not a standalone installed launcher. Read [PPT-DSL contracts](references/ppt-dsl-contracts.md) when marking or diagnosing contracts, and [generate a deck](references/ppt-dsl-generation.md) after acceptance.
 
 ## 1. Prepare and interpret the source
 
@@ -41,11 +43,19 @@ Use `window.slidelatchWorkflow.inspect()` to retrieve current identities. `searc
 
 Only record a boundary observation after inspecting that exact current probe in the rendered editor. Never fabricate pass records to unlock release. Any edits invalidate prior observations. SVG is approximate; require native Office checks when fidelity matters.
 
-## 4. Continue after the user confirms the marked result
+## 4. Accept the current marked file
 
-Wait for the user to confirm the marked result. If they change the document in Studio, inspect the current snapshot again and export the exact edited marked PPTX through the existing Export controls before compiling; do not reuse the pre-review disk copy. The user may instead click Create deck themselves.
+Wait for the user to confirm the marked result. Marking acceptance approves editable semantics; it does not approve a new content outline or create boundary/native evidence. Reuse an already approved outline or generation brief without asking again.
 
-Read `docs/design/ai-template-workflow.md` and `docs/design/ai-entrypoint.md`. `window.slidelatchWorkflow.exportReviewBundle()` downloads a ZIP whose review is bound to the actual written `marked.pptx` bytes. Capture the real download, then use `template:release` when its reviewed release gates pass. User confirmation does not create missing boundary observations or native Office evidence. Raw `template:compile` remains explicitly draft, not visual approval. Use the browser Deck studio within its supported subset, or the complete runtime commands for assets/data/lists beyond that subset. Do not replace unsupported cases with silently altered layouts. Use the same manifest's text ranges and sample meanings for model filling; do not copy demo claims as user facts. Run validation and package verification before delivery. No test or bounded sample proves arbitrary PPT support or universal visual fidelity.
+If the user changes the document in Studio, inspect the current snapshot again and export the exact edited marked PPTX before compiling. Do not reuse the pre-review disk copy. `window.slidelatchWorkflow.exportReviewBundle()` downloads a ZIP whose review is bound to the actual written `marked.pptx` bytes. Capture the real download and keep that file and review together. The marked-PPTX export alone has no release evidence.
+
+Use `template:release` only when its reviewed gates pass. Missing observations require actual review; do not manufacture them from user confirmation. `template:compile` produces a draft with no visual approval. Report that distinction if only draft generation is possible.
+
+## 5. Generate through the built-in PPT-DSL runtime
+
+Read [generate a deck](references/ppt-dsl-generation.md). The AI compiles the accepted file, derives the feasible chapter plan, selects existing layouts, fills Manifest keys from the user's materials, binds authorized local assets, validates, generates and checks the final PPTX. Studio has no final-deck editing or creation controls. Keep the content JSON and page replacement operations inside the AI workflow.
+
+Deliver the PPTX and a concise report of actual checks and unresolved limits. Source-based generation preserves declared objects and contracts; no bounded test proves arbitrary PPT support or universal visual fidelity. OOXML package checks, approximate SVG observations and native PowerPoint evidence remain distinct.
 
 ## Optional existing Codex CLI
 

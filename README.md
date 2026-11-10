@@ -3,7 +3,7 @@
 **配置一次 PPT 模板，让 AI 按你的设计生成。**  
 **Your PowerPoint design. Reused by AI.**
 
-保留用户已有 PPT 的设计，辅助配置可修改对象与约束，形成可复用的模板合同。外部 AI 提供内容，确定性生成器负责校验并输出可编辑 PPTX。产品目标是让任意 AI 沿用用户的完整设计生成。
+保留用户已有 PPT 的设计，辅助配置可修改对象与约束，形成可复用的模板合同。AI 通过统一 SlideLatch Skill 完成打标、编译、选页、填充与生成，用户在 Studio 验收已标记稿。确定性生成器负责校验并输出可编辑 PPTX。产品目标是让任意 AI 沿用用户的完整设计生成。
 
 ## 当前进度
 
@@ -29,11 +29,11 @@
 
 ## 技术基础
 
-- [PPT-DSL Skill](/Users/feng/.codex/skills/ppt-node-dsl-generator/SKILL.md)：Node/TypeScript CLI，提供模板编译、Schema、输入校验、PPTX 生成与包检查。
-- 线上 PPT 运行时：`/Volumes/GW/codes/goProject/github.com/HYY-yu/joyfulWords/pptx_dsl_runtime`。
-- 待新增：页面预览、对象选择、可视化打标、版本管理、独立分发，以及短报告所需的页面策略。
+- [SlideLatch Skill](.agents/skills/slidelatch-workflow/SKILL.md) 是统一 AI 操作入口，内含标记验收和 PPT-DSL 成稿流程。无需另行安装 PPT-DSL Skill。
+- `packages/ppt-dsl` 提供模板编译、候选页选择、两阶段输入校验、原生 PPTX 生成与包检查，保留上游许可与来源说明。
+- Studio 以画布为中心，供用户验收和微调已标记稿。成稿替换、内容 JSON 与生成命令由 AI 处理。
 
-当前包含 landing 页面与项目文档；生成器尚未引入。技术改动需同步维护需求、合同文档与相关测试。
+流程、支持范围和分层证据见 [AI 入口](docs/design/ai-entrypoint.md) 与 [模板编译和复用](docs/design/ai-template-workflow.md)。原生 PowerPoint 保真仍须按实际文件验收，程序或 SVG 通过不代表原生通过。
 
 ## 本地预览
 

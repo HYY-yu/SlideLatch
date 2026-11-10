@@ -4,7 +4,7 @@
 
 ## Skill 先打标，Studio 后验收
 
-用户的主要入口是 SlideLatch Skill。AI 在当前已授权会话中完成准备、语义判断与打标，随后把真实 `marked.pptx` 加载到 Studio，再交给用户验收。Studio 保留画布、属性、问题与创建成稿，不提供 AI 请求或提案 JSON 的人工交接窗口。用户确认后，由 AI 编译当前已验收稿，或由用户自己点击创建成稿。
+用户的主要入口是 SlideLatch Skill。AI 在当前已授权会话中完成准备、语义判断与打标，随后把真实 `marked.pptx` 加载到 Studio，再交给用户验收。Studio 保留画布、属性、问题与标记稿/验收包导出。用户确认后，由同一个 SlideLatch Skill 驱动 AI 编译当前已验收稿，再通过仓库内 PPT-DSL 选页、填充、校验和生成。成稿替换、内容 JSON 和创建操作均由 AI 处理，不进入用户工作台。
 
 用户确认与 SVG 边界记录、原生 PowerPoint 证据、正式 release 门禁分别处理，不能相互冒充。
 
@@ -68,10 +68,12 @@ npm run ai:codex -- --bundle /absolute/path/new-handoff \
 
 本机临时输出 `/tmp/slidelatch-ai-growth-20261107/generated.pptx` 是测试产物，不是经过目视签核的正式交付模板。
 
-## 浏览器复用
+## 统一 Skill 与 Studio 的分工
 
-工作台的 Deck studio 将模板页选择、填写、完整输入校验和 PPTX 下载接起来。沿用原始 OOXML，不画新的品牌设计。浏览器仅开放明确支持的纯文本/序号与原数量列表；复杂资产、富文本或数据替换使用完整 CLI，不能悄悄降级为外观相近的页面。
+`.agents/skills/slidelatch-workflow/SKILL.md` 是唯一产品 Skill 入口。其本地 references 内聚 PPT-DSL 的对象合同、大纲容量、模板选择、两阶段内容校验、资产绑定、精确修复、生成与检查流程，不要求另行安装或调用 PPT-DSL Skill。确定性运行时沿用 `packages/ppt-dsl`，没有复制另一套代码或新增模型服务。
 
-工作台内部的 `WorkflowController` 不渲染用户窗口，持续提供 `window.slidelatchWorkflow` 的检查、提案应用、实测与审查包导出能力。`exportReviewBundle()` 对实际写回文件计算 SHA 后打包，不能用未绑定输出字节的内存状态代替。
+Studio 仅供已标记稿验收与微调。`WorkflowController` 不渲染 AI 窗口，持续提供 `window.slidelatchWorkflow` 的检查、提案应用、实测与审查包导出能力。`exportReviewBundle()` 对实际写回文件计算 SHA 后打包。AI 必须编译用户最后确认的精确文件，不能继续使用用户编辑前的副本。
 
-具体支持边界、当前编译源/正式 release 区别与最终验证记录见 `ai-template-workflow.md`。SVG 近似预览与结构检查均不能取代原生 PowerPoint 验收。
+AI 在用户确认后调用 `template:release` 或明确标为草稿的 `template:compile`，再执行 `template:select`、`deck:validate --content-only`、完整 `deck:validate`、`deck:generate` 和 `deck:verify`。标记验收与内容大纲确认分别处理；已有获批大纲直接沿用。Studio 不提供成稿页选择、替换、JSON 填写或创建按钮。
+
+具体支持边界、草稿与正式 release 区别见 `ai-template-workflow.md`。程序检查不代替 SVG 观察或原生 PowerPoint 验收；旧独立 PPT-DSL Skill 的程序验证默认值不覆盖本仓库门禁。
