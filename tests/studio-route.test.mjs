@@ -27,14 +27,31 @@ const leaf = () => null;
 const link = ({ children, href, ...props }) => React.createElement('a', { ...props, href }, children);
 const i18n = load('lib/i18n.ts');
 const editor = load('lib/pptx/copy.ts');
+const studioShell = load('components/studio/studio-shell.tsx', {
+  'next/link': link, '../pptx/svg-slide': leaf, './studio-shell.module.css': {__esModule:true,default:new Proxy({}, {get:(_,name)=>String(name)})},
+}).default;
+for (const locale of i18n.locales) test(`${locale}: loaded Studio keeps one canvas and exposes source slides without marketing steps`,()=>{
+  const model={slides:Array.from({length:33},(_,index)=>({path:`ppt/slides/slide${index+1}.xml`,nodes:[]})),deck:{size:{width:960,height:540}}};
+  const html=renderToStaticMarkup(React.createElement(studioShell,{
+    locale,view:'template',model,fileName:'minimal-business-original.pptx',loading:false,busy:false,error:'',page:0,
+    committedPatches:{},textPreviews:{},deck:{source:null,deck:{slides:[]},operation:'',error:'',notice:'',activeSlide:0,check:null},
+    properties:null,input:React.createElement('input',{type:'file'}),canvas:React.createElement('svg',{'aria-label':'Source canvas'}),actions:null,workflow:null,issues:[],download:null,
+  }));
+  assert.equal((html.match(/<svg/g)||[]).length,1);
+  assert.equal((html.match(/aria-current="page"/g)||[]).length,1);
+  assert.match(html,/minimal-business-original.pptx/);
+  assert.match(html,locale==='zh'?/33 页源模板/:/33 source slides/);
+  assert.doesNotMatch(html,/demo-stepper|三步体验|Explore the product in three steps|页面清单优先/);
+});
+const deckPresenter = props => props.render ? props.render({source:null,deck:{slides:[]},operation:'',error:'',notice:'',activeSlide:0,check:null}) : React.createElement('section',{id:'deck-studio'});
 const demo = load('components/template-demo.tsx', Object.fromEntries([
   ['@/lib/pptx/copy', editor], ['@/lib/pptx/dsl', load('lib/pptx/dsl.ts')],
   ['@/lib/demo/template.json', JSON.parse(readFileSync(new URL('../lib/demo/template.json', import.meta.url)))],
   ['@/lib/demo/template.en.json', JSON.parse(readFileSync(new URL('../lib/demo/template.en.json', import.meta.url)))],
   ...['@/lib/analytics/browser', '@/lib/pptx/load', '@/lib/pptx/xml', '@/lib/pptx/validation', '@/lib/pptx/geometry', '@/lib/pptx/grouping', '@/lib/pptx/text-preview', '@/lib/pptx/shortcuts', '@/lib/pptx/marking'].map(name => [name, empty]),
-  ['@/lib/pptx/lists', { slideLists: () => [] }],
+  ['@/lib/pptx/lists', { slideLists: () => [] }], ['@/lib/workflow/studio-issue', load('lib/workflow/studio-issue.ts')],
   ...['./pptx/svg-slide', './pptx/workflow-panel', './pptx/list-objects', './pptx/list-settings', './pptx/text-length-controls'].map(name => [name, leaf]),
-  ['./pptx/deck-studio', () => React.createElement('section', { id: 'deck-studio' })],
+  ['./pptx/deck-studio', deckPresenter], ['./studio/studio-shell', studioShell],
 ])).default;
 
 for (const locale of i18n.locales) {
@@ -46,6 +63,9 @@ for (const locale of i18n.locales) {
     const studio = renderToStaticMarkup(React.createElement(demo, { locale, mode: 'studio' }));
     assert.match(studio, /type="file"/);
     assert.match(studio, /id="deck-studio"/);
+    assert.doesNotMatch(studio, /id="demo-title"|demo-stepper|下一步|Next step/);
+    assert.match(studio, /Slide.*Latch.*Studio/);
+    assert.match(studio, new RegExp(`href="/${locale}"`));
   });
 }
 

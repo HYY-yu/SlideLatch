@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import JSZip from 'jszip';
+import { parseStudioContent } from '@/lib/workflow/deck-input-text';
 import type { Locale } from '@/lib/i18n';
 import type { LoadedTemplate, Patches } from '@/lib/pptx/types';
 import { writePptx } from '@/lib/pptx/xml';
@@ -15,11 +16,26 @@ import templateEn from '@/lib/demo/template.en.json';
 import SvgSlide from './svg-slide';
 import styles from './deck-studio.module.css';
 
-type Props = { locale: Locale; model: LoadedTemplate | null; patches: Patches; busy: boolean; fileName: string };
+type Props = { locale: Locale; model: LoadedTemplate | null; patches: Patches; busy: boolean; fileName: string; render?: (presentation: DeckPresentation) => ReactNode };
 type Source = { template: BrowserTemplate; bytes: Uint8Array; name: string; origin: 'workspace' | 'demo' | 'import'; review?: unknown; preview: LoadedTemplate | null };
 type Check = { revision: number; issues: string[] };
 type Download = { url: string; name: string; bytes: number; slideCount: number };
 type FieldChange = { slideIndex: number; key: string; value: string; listKey?: string; itemIndex?: number };
+export type DeckPresentation = {
+  source: Source | null; deck: DeckInput; activeSlide: number; operation: string;
+  error: string; notice: string; valid: boolean; check: Check | null;
+  download: Download | null; bundle: Download | null;
+  selectedPage: BrowserTemplate['slides'][number] | undefined;
+  previews: Record<string,string>; fields: ReactNode;
+  candidates: BrowserTemplate['slides']; candidateId: string; pageFilter: string;
+  selectCandidate:(id:string)=>void; filterPages:(type:string)=>void; addPage:()=>void; replacePage:()=>void;
+  locateIssue:(issue:string)=>void; selectedKey: string | null; selectObject: (key: string | null) => void;
+  selectSlide: (index: number) => void; createFromWorkspace: () => Promise<boolean>;
+  validate: () => void; generate: () => void; exportTemplate: () => void;
+  cancel: () => void; moveSlide: (index: number, direction: -1 | 1) => void;
+  removeSlide: (index: number) => void; title: (value: string) => void;
+  importContent: (value: string) => void; exportContent: () => void;
+};
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 const copyBytes = (bytes: Uint8Array) => new Uint8Array(bytes).buffer;
@@ -29,6 +45,7 @@ const message = (cause: unknown) => cause instanceof Error ? cause.message : Str
 /** Strictly local inputs; no asset URL fields or remote generation requests. */
 export default function DeckStudio(props: Props) {
   const { locale, model, patches, busy: editorBusy, fileName } = props, zh = locale === 'zh';
+  const [selectedKey, setSelectedKey] = useState<string|null>(null);
   const [ready, setReady] = useState(false);
   const [source, setSource] = useState<Source | null>(null);
   const [deck, setDeck] = useState<DeckInput>({ title: 'SlideLatch', slides: [] });
@@ -54,7 +71,7 @@ export default function DeckStudio(props: Props) {
   function current(task: NonNullable<typeof operationRef.current>, version: number) { return mounted.current && operationRef.current === task && !task.controller.signal.aborted && revision.current === version && (task.kind !== 'workspace' || (live.current.model === task.model && live.current.patches === task.patches)); }
   function finish(task: NonNullable<typeof operationRef.current>) { if (operationRef.current === task) { operationRef.current = null; if (mounted.current) setOperation(''); } }
   function cancel() { operationRef.current?.controller.abort(); operationRef.current = null; clearResults(); setOperation(''); setNotice(zh ? '已取消。未完成的结果不会替换当前内容。' : 'Canceled. Unfinished results will not replace your content.'); }
-  async function run(action: () => unknown | Promise<unknown>) { try { await action(); } catch (cause) { if (mounted.current) setError(message(cause)); } }
+  async function run(action: () => unknown | Promise<unknown>) { try { await action(); } catch (cause) { console.error('[SlideLatch] studio.operation.failed', cause); if (mounted.current) setError(message(cause)); } }
   // A draft compiled from the authoring workspace cannot survive a later source edit.
   useEffect(() => {
     if (sourceRef.current?.origin !== 'workspace' && operationRef.current?.kind !== 'workspace') return;
@@ -66,26 +83,29 @@ export default function DeckStudio(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, patches]);
 
-  async function install(bytes: Uint8Array, name: string, origin: Source['origin'], task: NonNullable<typeof operationRef.current>, version: number, options: { manifest?: unknown; lock?: unknown; review?: unknown } = {}) {
+  async function install(bytes: Uint8Array, name: string, origin: Source['origin'], task: NonNullable<typeof operationRef.current>, version: number, options: { manifest?: unknown; lock?: unknown; review?: unknown; createStarter?: boolean } = {}) {
     const template = await loadBrowserTemplate(bytes, { manifest: options.manifest, lock: options.lock });
     if (!current(task, version)) return;
     const review = options.review === undefined ? undefined : await validateReleaseReview(bytes, options.review);
     if (review) assertReviewMatchesManifest(template.manifest, review.probes);
     if (!current(task, version)) return;
     let preview: LoadedTemplate | null = null;
-    try { preview = await loadTemplate(copyBytes(bytes)); } catch { /* Preview support is independent of the OOXML generation gate. */ }
+    try { preview = await loadTemplate(copyBytes(bytes)); } catch (cause) { console.warn('[SlideLatch] studio.preview.unavailable', cause); }
     if (!current(task, version)) return;
+    if(options.createStarter&&props.render&&!preview)throw new Error('STUDIO_PREVIEW_UNAVAILABLE');
+    const starter=options.createStarter?createBrowserDeckInput(template):{slides:[]};
+    if(options.createStarter&&!starter.slides.length)throw new Error(zh?'模板缺少完整成稿所需页面合同。原有内容已保留。':'This template lacks the page contracts for a complete deck. Existing content is preserved.');
     const next: Source = { template, bytes: new Uint8Array(bytes), name, origin, review, preview };
-    clearResults(); sourceRef.current = next; setSource(next); deckRef.current = { title: name.replace(/\.(pptx|zip)$/i, ''), slides: [] }; setDeck(deckRef.current);
+    clearResults(); sourceRef.current = next; setSource(next); deckRef.current = { ...starter, title: name.replace(/\.(pptx|zip)$/i, '') }; setDeck(deckRef.current);
     setActiveSlide(0); setPageFilter(''); setCandidateId(template.slides[0]?.templateId ?? '');
     setBundle(previous => { revoke(previous?.url); return null; });
     setNotice(zh ? '模板已编译。选择页面加入成稿，然后填写内容。' : 'Template compiled. Add pages to your deck, then fill the fields.');
     return { templateSha256: template.sourceSha256, slideCount: template.slides.length };
   }
-  async function compileWorkspace() {
+  async function compileWorkspace(createStarter=false) {
     if (!live.current.model || live.current.busy) throw new Error(zh ? '请先打开 PPTX 并完成当前编辑。' : 'Open a PPTX and finish the current edit first.');
     const task = start('workspace'), version = revision.current, captured = live.current;
-    try { const bytes = await writePptx(captured.model!.bytes, captured.patches); if (!current(task, version)) return; return await install(new Uint8Array(bytes), captured.fileName || 'workspace.pptx', 'workspace', task, version); }
+    try { const bytes = await writePptx(captured.model!.bytes, captured.patches); if (!current(task, version)) return; return await install(new Uint8Array(bytes), captured.fileName || 'workspace.pptx', 'workspace', task, version, {createStarter}); }
     catch (cause) { if (current(task, version)) throw cause; }
     finally { finish(task); }
   }
@@ -228,6 +248,34 @@ export default function DeckStudio(props: Props) {
     return <div className={styles.field} key={node.key}><label htmlFor={id}><span>{node.key}</span><span className={invalid ? styles.invalid : ''}>{count}{node.length ? ` / ${node.length.min}–${node.length.max}` : ''} {zh ? '字符' : 'characters'}</span></label><textarea id={id} rows={node.length && node.length.max <= 40 ? 2 : 3} value={text} disabled={!!operation} maxLength={20000} aria-invalid={!!invalid} onChange={event => void run(() => setField({ slideIndex: activeSlide, key: node.key, value: event.target.value, listKey, itemIndex }))}/></div>;
   }
 
+  if (props.render) {
+    const visible = (component: ComponentManifest) => !selectedKey || `${selectedPage?.slidePath}#${component.locator.shapeId}` === selectedKey;
+    const fields = selectedPage && selectedInput ? <>
+      {selectedPage.nodes.filter(visible).map(node => field(node, selectedInput.nodes?.[node.key]))}
+      {selectedPage.lists.map(list => <div key={list.key}>{list.items.map((item,index) => <div key={item.itemIndex}>{item.components.filter(visible).map(node => field(node,selectedInput.lists?.[list.key]?.[index]?.[node.key],list.key,index))}</div>)}</div>)}
+    </> : null;
+    return props.render({source,deck,activeSlide,operation,error,notice,valid,check,download,bundle,selectedPage,previews,fields,selectedKey,candidates,candidateId,pageFilter,selectCandidate:setCandidateId,filterPages:setPageFilter,addPage:()=>void run(()=>{addSlide(candidateId);setSelectedKey(null)}),replacePage:()=>void run(()=>{replaceSlide(candidateId,activeSlide);setSelectedKey(null)}),
+      locateIssue:issue=>{
+        const indexed=/slides\[(\d+)\]/.exec(issue);
+        const currentPage=deck.slides[activeSlide];
+        const index=indexed?Number(indexed[1]):currentPage&&issue.includes(currentPage.templateId)?activeSlide:deck.slides.findIndex(slide=>issue.includes(slide.templateId));
+        const entry=deck.slides[index],page=source?.template.slides.find(slide=>slide.templateId===entry?.templateId);
+        if(!page)return;setActiveSlide(index);
+        const item=/\[(\d+)\]/.exec(issue.replace(/slides\[\d+\]/,''));
+        const tokens=issue.split(/[^A-Za-z_0-9]+/);
+        const component=page.nodes.find(node=>tokens.includes(node.key))??page.lists.flatMap(list=>list.items.filter((_,i)=>!item||i===Number(item[1])).flatMap(row=>row.components)).find(node=>tokens.includes(node.key));
+        setSelectedKey(component?`${page.slidePath}#${component.locator.shapeId}`:null);
+      },
+      selectObject:setSelectedKey,
+      selectSlide:index=>{setActiveSlide(index);setSelectedKey(null)},
+      createFromWorkspace:async()=>{let success=false;await run(async()=>{const result=await compileWorkspace(true);if(result){setSelectedKey(null);success=true}});return success;},
+      validate:()=>void run(validate),generate:()=>void run(generate),exportTemplate:()=>void run(async()=>{if(!sourceRef.current)await compileWorkspace();if(sourceRef.current)await exportTemplate()}),cancel,
+      moveSlide:(index,direction)=>void run(()=>moveSlide(index,direction)),removeSlide:index=>void run(()=>{removeSlide(index);setSelectedKey(null)}),
+      title:value=>void run(()=>{assertIdle();setInput({...deckRef.current,title:value})}),
+      importContent:value=>void run(()=>{assertIdle();const input=parseStudioContent(value);if(!sourceRef.current||input.slides.some(slide=>!sourceRef.current!.template.slides.some(candidate=>candidate.templateId===slide.templateId)))throw new Error('CONTENT_TEMPLATE_ID_UNKNOWN');setInput(input);setActiveSlide(0);setSelectedKey(null)}),
+      exportContent:()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(deckRef.current,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='deck-input.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)},
+    });
+  }
   return <section id="deck-studio" className={styles.studio} aria-labelledby="deck-studio-title" aria-busy={!!operation}>
     <header className={styles.heading}><div><p className={styles.eyebrow}>02 / {zh ? '模板 → 成稿' : 'TEMPLATE → DECK'}</p><h2 id="deck-studio-title">{zh ? '选择模板，填充成稿' : 'Build a deck from your template'}</h2></div><span className={styles.status}>{source?.review ? (zh ? 'SVG 边界审查已核对' : 'SVG boundary review checked') : (zh ? '草稿 · 未经过发布审查' : 'Draft · not release-reviewed')}</span></header>
     <p className={styles.description}>{zh ? '忠于原 PPT，快速填充复用。使用上方编辑结果或已编译模板，文件与内容只在此浏览器处理。' : 'Reuse the original PPT design with new content. Use your edits above or a compiled template; files and content stay in this browser.'}</p>
