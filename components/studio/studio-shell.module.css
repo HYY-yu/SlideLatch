@@ -72,27 +72,6 @@
 .panel{border-left:1px solid var(--studio-border);height:calc(100svh - 165px);overflow:auto;min-width:0;scrollbar-width:thin}
 .panelHeading{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--studio-border);position:sticky;top:0;background:#fff;z-index:3}
 .panelHeading button{padding:2px 8px;font-size:18px}
-.workflow>section{padding:16px!important;border:0!important}
-.workflow h3{display:none}
-.workflow button{border-color:var(--studio-border);margin:3px 0!important;font-size:11px;padding:7px 8px}
-.workflow fieldset{border:0;border-top:1px solid var(--studio-border);padding:16px 0!important;margin:20px 0!important;min-width:0}
-.workflow legend{font-size:12px;font-weight:600}
-.workflow label{font-size:11px;margin-left:0!important}
-.workflow select{margin:5px 0}
-.workflow input[type=number]{margin:5px 0;width:80px!important}
-.workflow details{font-size:11px;color:var(--studio-muted);margin:12px 0}
-.workflow>section>details{margin:0;border-top:1px solid var(--studio-border)}
-.workflow summary{padding:13px 0;cursor:pointer;font-size:12px;color:var(--studio-ink)}
-.workflow :global(.workflow-primary-actions){display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.workflow :global(.workflow-primary-actions) button{flex:1;min-width:100px;font-size:12px;padding:10px 8px}
-.workflow :global(.workflow-primary-action){background:var(--studio-accent);border-color:var(--studio-accent);color:#fff}
-.workflow :global(.workflow-primary-action):hover{background:#6146bb}
-.workflow :global(.workflow-tool-body){padding:0 0 16px}
-.workflow :global(.workflow-proposal) textarea{margin-top:0!important}
-.workflow :global(.workflow-tool-body) button{margin-right:5px!important}
-.workflow pre{font-size:10px;overflow-wrap:anywhere}
-.workflow textarea{font-size:11px}
-.workflow p{font-size:11px;overflow-wrap:anywhere}
 .exportPanel,.contentPanel{padding:18px}
 .exportPanel h3{margin:20px 0 10px}
 .exportPanel h3:first-child{margin-top:0}

@@ -7,8 +7,8 @@ import type {DeckPresentation} from '../pptx/deck-studio';
 import SvgSlide from '../pptx/svg-slide';
 import styles from './studio-shell.module.css';
 
-type Props={locale:Locale;view:'template'|'deck';onView:(view:'template'|'deck')=>void;model:LoadedTemplate|null;fileName:string;loading:boolean;busy:boolean;error:string;page:number;committedPatches:Patches;textPreviews:Record<string,string>;deck:DeckPresentation;properties:ReactNode;onLocateIssue:(issue:string)=>void;onPage:(page:number)=>void;onOpen:()=>void;onRetry:()=>void;input:ReactNode;canvas:ReactNode;actions:ReactNode;workflow:ReactNode;issues:string[];onExport:()=>void;exportBlocked:boolean;exporting:boolean;download:{url:string;name:string;report:string}|null};
-type Panel='none'|'ai'|'export'|'content'|'pages';
+type Props={locale:Locale;view:'template'|'deck';onView:(view:'template'|'deck')=>void;model:LoadedTemplate|null;fileName:string;loading:boolean;busy:boolean;error:string;page:number;committedPatches:Patches;textPreviews:Record<string,string>;deck:DeckPresentation;properties:ReactNode;onLocateIssue:(issue:string)=>void;onPage:(page:number)=>void;onOpen:()=>void;onRetry:()=>void;input:ReactNode;canvas:ReactNode;actions:ReactNode;issues:string[];onExport:()=>void;exportBlocked:boolean;exporting:boolean;download:{url:string;name:string;report:string}|null};
+type Panel='none'|'export'|'content'|'pages';
 const pageName=(type:string,zh:boolean)=>zh?type:({'封面页':'Cover','目录页':'Contents','章节过渡页':'Chapter','内容页':'Content','结尾页':'Closing'}[type]??type);
 export default function StudioShell(p:Props){
   const zh=p.locale==='zh',d=p.deck;
@@ -29,15 +29,14 @@ export default function StudioShell(p:Props){
   const issues=draft?(d.check?.issues??[]):p.issues;
   const title=zh?'成稿':'Deck';
   const preview=(index:number)=>{if(!d.source?.preview)return null;const item=d.source.template.slides.find(slide=>slide.templateId===d.deck.slides[index]?.templateId);return item?<SvgSlide model={d.source.preview} slideIndex={item.slideNumber-1} patches={{}} locale={p.locale}/>:null};
-  function openPanel(next:Panel){if(next==='ai')setView('template');setPanel(value=>value===next?'none':next)}
+  function openPanel(next:Panel){setPanel(value=>value===next?'none':next)}
   return <div id="deck-studio" className={styles.studio} aria-busy={pending}>
     {p.input}
     <header className={styles.header}>
       <Link href={`/${p.locale}`} className={styles.brand} aria-label={zh?'SlideLatch 返回首页':'SlideLatch home'}>Slide<span>Latch</span> <small>Studio</small></Link>
-      <div className={styles.identity}><h1>{p.fileName||(zh?'PPT 工作台':'Deck studio')}</h1><span>{zh?'本地草稿':'Local draft'} · {p.model?.slides.length??0} {zh?'页源模板':'source slides'}{draft?` / ${count} ${zh?'页成稿':'deck slides'}`:''}</span></div>
+      <div className={styles.identity}><h1>{p.fileName||(zh?'PPT 工作台':'Deck studio')}</h1><span>{draft?(zh?'成稿编辑':'Deck editing'):(zh?'标记验收':'Review marks')} · {p.model?.slides.length??0} {zh?'页源模板':'source slides'}{draft?` / ${count} ${zh?'页成稿':'deck slides'}`:''}</span></div>
       <nav className={styles.headerActions} aria-label={zh?'工作台操作':'Studio actions'}>
         <button disabled={pending} onClick={p.onOpen}>{zh?'打开':'Open'}</button>
-        <button disabled={!p.model||pending} aria-expanded={panel==='ai'} onClick={()=>openPanel('ai')}>{zh?'AI 协作':'AI handoff'}</button>
         <button className={styles.primary} disabled={!p.model||pending} aria-expanded={panel==='export'} onClick={()=>openPanel('export')}>{zh?'导出':'Export'}</button>
         <Link href={`/${zh?'en':'zh'}/deck-studio`} aria-label={zh?'切换到英文':'Switch to Chinese'}>{zh?'EN':'中文'}</Link>
       </nav>
@@ -65,13 +64,11 @@ export default function StudioShell(p:Props){
         {tab==='issues'?<div className={styles.issueList}>{issues.length?issues.map((issue,i)=><button key={i} onClick={()=>{if(draft)d.locateIssue(issue);else p.onLocateIssue(issue);setTab('properties')}}>{issue}</button>):<p>{zh?'当前无已报告问题':'No reported issues'}</p>}{draft&&!d.check&&<button onClick={d.validate} disabled={pending}>{zh?'校验内容':'Validate content'}</button>}</div>:draft?<div className={styles.deckInspector}><div className={styles.label}>{zh?'成稿内容':'Deck content'}</div>{d.fields}<details><summary>{zh?'本页对象':'Slide objects'}</summary>{sourceNodes.filter(node=>node.hasTextBody||node.text).map(node=><button className={styles.object} key={node.key} onClick={()=>d.selectObject(node.key)}>{node.text.slice(0,40)||node.name}</button>)}<button onClick={()=>d.selectObject(null)}>{zh?'显示全部字段':'Show all fields'}</button></details></div>:p.properties}
       </aside>
       <aside className={styles.panel} hidden={panel==='none'} aria-label={zh?'文档操作面板':'Document actions'}>
-        <div className={styles.panelHeading}><h2>{panel==='ai'?(zh?'AI 协作':'AI handoff'):panel==='export'?(zh?'导出':'Export'):panel==='pages'?(zh?'选择模板页':'Choose source slide'):(zh?'内容 JSON':'Content JSON')}</h2><button aria-label={zh?'关闭面板':'Close panel'} onClick={()=>setPanel('none')}>×</button></div>
-        <div hidden={panel!=='ai'} className={styles.workflow}>{p.workflow}</div>
+        <div className={styles.panelHeading}><h2>{panel==='export'?(zh?'导出':'Export'):panel==='pages'?(zh?'选择模板页':'Choose source slide'):(zh?'内容 JSON':'Content JSON')}</h2><button aria-label={zh?'关闭面板':'Close panel'} onClick={()=>setPanel('none')}>×</button></div>
         <div hidden={panel!=='export'} className={styles.exportPanel}>
           <h3>{zh?'标记 PPTX':'Marked PPTX'}</h3><button className={styles.primary} disabled={p.exportBlocked||pending} onClick={p.onExport}>{p.exporting?(zh?'正在写回…':'Writing…'):(zh?'生成标记 PPTX':'Generate marked PPTX')}</button>
           {p.download&&<a className={styles.download} download={p.download.name} href={p.download.url}>{zh?'下载标记 PPTX':'Download marked PPTX'} ↓ <small>{p.download.report}</small></a>}
           <h3>{zh?'编译草稿包':'Compiled draft package'}</h3><button disabled={pending} onClick={d.exportTemplate}>{zh?'编译并打包':'Compile and package'}</button>{d.bundle&&<a className={styles.download} href={d.bundle.url} download={d.bundle.name}>{zh?'下载草稿 ZIP':'Download draft ZIP'} ↓</a>}
-          <h3>{zh?'审查包':'Review package'}</h3><button onClick={()=>{setView('template');setPanel('ai')}}>{zh?'打开边界审查':'Open boundary review'}</button>
           {!!d.deck.slides.length&&<><h3>{zh?'成稿 PPTX':'Generated PPTX'}</h3><label>{zh?'成稿名称':'Deck name'}<input value={d.deck.title??''} disabled={pending} onChange={event=>d.title(event.target.value)}/></label><button disabled={pending} onClick={d.validate}>{zh?'校验内容':'Validate content'}</button><button className={styles.primary} disabled={pending||!d.valid} onClick={d.generate}>{zh?'生成成稿 PPTX':'Generate deck PPTX'}</button>{d.download&&<a className={styles.download} href={d.download.url} download={d.download.name}>{zh?'下载成稿 PPTX':'Download generated PPTX'} ↓ <small>{d.download.slideCount} {zh?'页':'slides'} · {Math.round(d.download.bytes/1024)} KB</small></a>}</>}
           <details><summary>{zh?'支持范围与检查':'Support and checks'}</summary><p>{zh?'标记稿保留原始对象。浏览器成稿支持纯文本、自动序号和原项数列表。编译包是草稿，正式发布仍需边界审查与发布门禁。':'Marked files retain original objects. Browser generation supports plain text, numbering and original list counts. Compiled packages are drafts; release gates still apply.'}</p><p>{zh?'成稿仍需封面、目录、3–6 个章节和结尾。SVG 与包结构检查不能代替 PowerPoint 目视验收。':'Generated decks still require a cover, contents, 3–6 chapters and closing. SVG and package checks do not replace native PowerPoint review.'}</p></details>
         </div>

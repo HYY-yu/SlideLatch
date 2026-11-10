@@ -35,38 +35,19 @@ for (const locale of i18n.locales) test(`${locale}: loaded Studio keeps one canv
   const html=renderToStaticMarkup(React.createElement(studioShell,{
     locale,view:'template',model,fileName:'minimal-business-original.pptx',loading:false,busy:false,error:'',page:0,
     committedPatches:{},textPreviews:{},deck:{source:null,deck:{slides:[]},operation:'',error:'',notice:'',activeSlide:0,check:null},
-    properties:null,input:React.createElement('input',{type:'file'}),canvas:React.createElement('svg',{'aria-label':'Source canvas'}),actions:null,workflow:null,issues:[],download:null,
+    properties:null,input:React.createElement('input',{type:'file'}),canvas:React.createElement('svg',{'aria-label':'Source canvas'}),actions:null,issues:[],download:null,
   }));
   assert.equal((html.match(/<svg/g)||[]).length,1);
   assert.equal((html.match(/aria-current="page"/g)||[]).length,1);
   assert.match(html,/minimal-business-original.pptx/);
   assert.match(html,locale==='zh'?/33 页源模板/:/33 source slides/);
-  assert.doesNotMatch(html,/demo-stepper|三步体验|Explore the product in three steps|页面清单优先/);
+  assert.doesNotMatch(html,/demo-stepper|三步体验|Explore the product in three steps|页面清单优先|AI 协作|AI handoff|导出 AI 请求|Import proposal|workflow-proposal/);
+  assert.match(html,locale==='zh'?/创建成稿/:/Create deck/);
+  assert.match(html,locale==='zh'?/标记验收/:/Review marks/);
   const doc=new DOMParser().parseFromString(html,'text/html');
   const tabs=Array.from(doc.getElementsByTagName('button')).filter(button=>button.getAttribute('role')==='tab');
   assert.deepEqual(tabs.map(tab=>tab.textContent),locale==='zh'?['属性','问题']:['Properties','Issues']);
   assert.equal(tabs[0].getAttribute('aria-selected'),'true');
-});
-const workflowPanel = load('components/pptx/workflow-panel.tsx', {
-  'jszip': class {}, 'react-dom': {flushSync: action=>action()},
-  ...Object.fromEntries(['@/lib/workflow/recognition','@/lib/workflow/constraint-search','@/lib/workflow/measure-preview','@/lib/pptx/xml','@/lib/workflow/session'].map(name=>[name,empty])),
-  '@/lib/pptx/lists': {slideLists:()=>[]},
-}).default;
-for (const locale of i18n.locales) test(`${locale}: AI handoff opens with request and import actions while advanced tools stay collapsed`,()=>{
-  const html=renderToStaticMarkup(React.createElement(workflowPanel,{
-    locale,model:{slides:[{nodes:[]}]},patches:{},currentSlideIndex:0,editorState:'',fileName:'public.pptx',busy:false,
-    svgRef:{current:null},onCapacityPreview:()=>{},onApply:()=>{},onPreview:()=>{},visibleProbeId:null,
-  }));
-  const doc=new DOMParser().parseFromString(html,'text/html');
-  const visibleButtons=Array.from(doc.getElementsByTagName('button')).filter(button=>{
-    for(let parent=button.parentNode;parent;parent=parent.parentNode)if(parent.nodeName==='details'&&!parent.hasAttribute('open'))return false;
-    return true;
-  });
-  assert.deepEqual(visibleButtons.map(button=>button.textContent),locale==='zh'?['导出 AI 请求','导入提案']:['Export AI request','Import proposal']);
-  const tools=Array.from(doc.getElementsByTagName('details')).filter(detail=>detail.hasAttribute('data-workflow-tool'));
-  assert.deepEqual(tools.map(detail=>detail.getAttribute('data-workflow-tool')),['boundaries','capacity','page','more']);
-  assert.ok(tools.every(detail=>!detail.hasAttribute('open')));
-  assert.equal(doc.getElementsByTagName('textarea').length,2,'proposal and page controls remain mounted');
 });
 const deckPresenter = props => props.render ? props.render({source:null,deck:{slides:[]},operation:'',error:'',notice:'',activeSlide:0,check:null}) : React.createElement('section',{id:'deck-studio'});
 const demo = load('components/template-demo.tsx', Object.fromEntries([
@@ -75,7 +56,7 @@ const demo = load('components/template-demo.tsx', Object.fromEntries([
   ['@/lib/demo/template.en.json', JSON.parse(readFileSync(new URL('../lib/demo/template.en.json', import.meta.url)))],
   ...['@/lib/analytics/browser', '@/lib/pptx/load', '@/lib/pptx/xml', '@/lib/pptx/validation', '@/lib/pptx/geometry', '@/lib/pptx/grouping', '@/lib/pptx/text-preview', '@/lib/pptx/shortcuts', '@/lib/pptx/marking'].map(name => [name, empty]),
   ['@/lib/pptx/lists', { slideLists: () => [] }], ['@/lib/workflow/studio-issue', load('lib/workflow/studio-issue.ts')],
-  ...['./pptx/svg-slide', './pptx/workflow-panel', './pptx/list-objects', './pptx/list-settings', './pptx/text-length-controls'].map(name => [name, leaf]),
+  ...['./pptx/svg-slide', './pptx/workflow-controller', './pptx/list-objects', './pptx/list-settings', './pptx/text-length-controls'].map(name => [name, leaf]),
   ['./pptx/deck-studio', deckPresenter], ['./studio/studio-shell', studioShell],
 ])).default;
 

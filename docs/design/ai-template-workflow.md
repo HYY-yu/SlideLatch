@@ -2,6 +2,10 @@
 
 日期：2026-11-07。产品统一为 **SlideLatch**，PPT-DSL 是底层模板合同及确定性运行时，不是第二个产品入口。本次没有推送、部署、额外调用付费模型服务或使用客户文件。目标是忠于原版的快速复用，不是依据品牌风格重新绘制页面。
 
+## 当前使用入口
+
+SlideLatch Skill 驱动 AI 完成准备、打标与加载真实标记稿，再打开 Studio 供用户验收。Studio 不提供人工搬运 AI 请求与提案 JSON 的窗口。用户确认后，AI 可导出当前精确稿并编译，用户也可直接创建成稿。底层无 UI 的 WorkflowController 保留共用工作区的操作接口；确认不代替边界、原生或发布证据。
+
 ## 目标架构
 
 1. 用户提供 PPTX，SlideLatch 保留原始 OOXML 为唯一设计来源。
@@ -97,7 +101,7 @@ npm run deck:verify -- --pptx ./result.pptx
 ## 代码入口
 
 - `components/template-demo.tsx`：现有工作台、本地导入、历史和预览接线。
-- `components/pptx/workflow-panel.tsx`：AI 提案、观察、审查包与有限浏览器 API。
+- `components/pptx/workflow-controller.tsx`：AI 提案、观察、审查包与有限浏览器 API。
 - `lib/workflow/session.ts`：纯数据协议、快照、提案、案例与审查状态。
 - `lib/workflow/release.ts`：文件指纹、OOXML 重读及完整观察门禁。
 - `scripts/slidelatch-release.ts`：固定已检查字节、编译与排他写入新目录。

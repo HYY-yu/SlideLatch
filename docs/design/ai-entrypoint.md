@@ -2,6 +2,12 @@
 
 2026-11-07。定位是**忠于原版的快速复用**：保留原 PPT 的对象、几何、样式和资源，只在明确合同内替换内容。不是根据品牌风格重新设计页面。所有范围仍以明确支持的对象与经过验证的合同为准，不承诺任意 PPT 或全内容视觉一致。
 
+## Skill 先打标，Studio 后验收
+
+用户的主要入口是 SlideLatch Skill。AI 在当前已授权会话中完成准备、语义判断与打标，随后把真实 `marked.pptx` 加载到 Studio，再交给用户验收。Studio 保留画布、属性、问题与创建成稿，不提供 AI 请求或提案 JSON 的人工交接窗口。用户确认后，由 AI 编译当前已验收稿，或由用户自己点击创建成稿。
+
+用户确认与 SVG 边界记录、原生 PowerPoint 证据、正式 release 门禁分别处理，不能相互冒充。
+
 ## 两种 AI 使用方式
 
 ### 已授权的 AI 对话 / 仓库 Skill
@@ -12,16 +18,16 @@
 npm run ai:prepare -- --template /absolute/path/input.pptx --out /absolute/path/new-handoff
 ```
 
-该离线命令绑定原 PPTX 字节和快照，输出请求、Schema、提示词与原稿副本。它只读取 OOXML，未渲染页面，也不假造映射成功或视觉通过记录。任意讲者备注不进入此命令，只传入已有的结构化页面合同。工作台导出的请求则以其当前渲染工作区为准。
+该离线命令绑定原 PPTX 字节和快照，输出请求、Schema、提示词与原稿副本。它只读取 OOXML，未渲染页面，也不假造映射成功或视觉通过记录。任意讲者备注不进入此命令，只传入已有的结构化页面合同。Skill 通过 Studio 操作接口读取的数据则以当前渲染工作区为准。
 
-模型读取 `recognition-request.json` / `prompt.txt` 后，返回含 `marks` 和/或 `pages` 的提案。用户确认后：
+AI 读取 `recognition-request.json` / `prompt.txt` 后，生成含 `marks` 和/或 `pages` 的提案并执行本地校验与应用：
 
 ```sh
 npm run ai:apply -- --bundle /absolute/path/new-handoff \
   --proposal /absolute/path/proposal.json --out /absolute/path/new-marked
 ```
 
-只允许写名称标记和专用页面合同，不能通过提案偷偷改正文、几何或任意备注。输出是 `needs_review` 的 `marked.pptx`，须加载到工作台实测边界，再经过正式 release 门禁。输出目录必须是新目录，防止覆盖已有资料。
+只允许写名称标记和专用页面合同，不能通过提案偷偷改正文、几何或任意备注。输出是 `needs_review` 的 `marked.pptx`，由 AI 加载到 Studio 并完成可执行的边界检查，再交用户验收。确认后如需正式发布，仍经过 release 门禁。输出目录必须是新目录，防止覆盖已有资料。
 
 ### 用户主动启动已有 Codex CLI
 
@@ -65,5 +71,7 @@ npm run ai:codex -- --bundle /absolute/path/new-handoff \
 ## 浏览器复用
 
 工作台的 Deck studio 将模板页选择、填写、完整输入校验和 PPTX 下载接起来。沿用原始 OOXML，不画新的品牌设计。浏览器仅开放明确支持的纯文本/序号与原数量列表；复杂资产、富文本或数据替换使用完整 CLI，不能悄悄降级为外观相近的页面。
+
+工作台内部的 `WorkflowController` 不渲染用户窗口，持续提供 `window.slidelatchWorkflow` 的检查、提案应用、实测与审查包导出能力。`exportReviewBundle()` 对实际写回文件计算 SHA 后打包，不能用未绑定输出字节的内存状态代替。
 
 具体支持边界、当前编译源/正式 release 区别与最终验证记录见 `ai-template-workflow.md`。SVG 近似预览与结构检查均不能取代原生 PowerPoint 验收。
