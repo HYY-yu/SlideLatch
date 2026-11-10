@@ -25,7 +25,7 @@ import { historyShortcut } from '@/lib/pptx/shortcuts';
 import { addedMarkName, allowedMarkTypes, removedMarkName } from '@/lib/pptx/marking';
 
 const emptyHistory={past:[] as Patches[],current:{} as Patches,future:[] as Patches[]};
-export default function TemplateDemo({locale}:{locale:Locale}) {
+export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'demo'|'studio'}) {
   const t=editorCopy[locale],template=locale==='en'?templateEn:templateZh;
   const [baseModel,setModel]=useState<LoadedTemplate|null>(null),[phase,setPhase]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState('');
   const [page,setPage]=useState(0),[selected,setSelected]=useState<string|null>(null),[markedOnly,setMarkedOnly]=useState(false);
@@ -274,8 +274,8 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
   return <section id="demo" className="demo-wrap interactive-demo pptx-workbench reveal" aria-labelledby="demo-title">
     <div id="workflow" className="demo-intro"><h2 id="demo-title">{t.title}</h2><p>{t.note}</p></div>
     <div className="demo-workspace">
-      <input ref={inputRef} type="file" accept=".pptx" hidden aria-label={locale==='zh'?'选择本地 PPTX':'Choose local PPTX'} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void openLocalFile(file)}}/>
-      <div className="pptx-toolbar"><button type="button" className="button button-secondary" disabled={loading||exporting||!!transient||!!groupMode} onClick={()=>inputRef.current?.click()}>{loading?t.loading:locale==='zh'?'打开本地 PPTX':'Open local PPTX'}</button><small>{locale==='zh'?'仅在浏览器中处理，不上传文件。最多 50 MB / 200 页。':'Processed in this browser, never uploaded. Up to 50 MB / 200 slides.'}</small></div>
+      {mode==='studio'&&<><input ref={inputRef} type="file" accept=".pptx" hidden aria-label={locale==='zh'?'选择本地 PPTX':'Choose local PPTX'} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void openLocalFile(file)}}/>
+      <div className="pptx-toolbar"><button type="button" className="button button-secondary" disabled={loading||exporting||!!transient||!!groupMode} onClick={()=>inputRef.current?.click()}>{loading?t.loading:locale==='zh'?'打开本地 PPTX':'Open local PPTX'}</button><small>{locale==='zh'?'仅在浏览器中处理，不上传文件。最多 50 MB / 200 页。':'Processed in this browser, never uploaded. Up to 50 MB / 200 slides.'}</small></div></>}
       <ol className="demo-stepper" aria-label={t.title}>{t.steps.map((label,i)=><li key={label}><button type="button" disabled={exporting||i>0&&!model} aria-current={phase===i?'step':undefined} onClick={()=>changeStep(i)}><span>{i<phase?'✓':`0${i+1}`}</span>{label}</button></li>)}</ol>
       {phase===0&&<div className="pptx-choose"><div><img src={template.overview} alt={t.overview}/></div><aside><p className="eyebrow">01</p><h3>{t.template}</h3><p>{t.chooseHint}</p><button className="button button-primary" onClick={openTemplate} disabled={loading}>{loading?t.loading:t.choose}<span aria-hidden="true">→</span></button></aside></div>}
       {phase===1&&model&&source&&<>
@@ -310,13 +310,13 @@ export default function TemplateDemo({locale}:{locale:Locale}) {
             </section>:<section className="pptx-inspector-body" aria-label={t.mark}><h3>{t.mark}</h3><p className="pptx-empty">{t.select}</p></section>}
           </aside>
         </div>
-        <WorkflowPanel editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])} svgRef={svgRef} onCapacityPreview={setCapacityPreview} key={fileSession} model={model} patches={history.current} locale={locale} fileName={fileName} visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}} onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}}/>
+        {mode==='studio'&&<WorkflowPanel editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])} svgRef={svgRef} onCapacityPreview={setCapacityPreview} key={fileSession} model={model} patches={history.current} locale={locale} fileName={fileName} visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}} onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}}/>}
         {(issues.length>0||model.mappingWarnings.length>0)&&<div className="pptx-validation" role="status"><strong>{model.mappingWarnings.length?t.mapping:t.validation}</strong><span>{[...model.mappingWarnings,...issues.map(issueText)].slice(0,4).join(' · ')}</span></div>}
       </>}
       {phase===2&&download&&<div className="pptx-export-result"><span className="export-check">✓</span><h3>{t.done}</h3><p>{t.doneHint}</p><small>{exportReport}</small><a className="button button-primary" href={download} onClick={()=>track('workbench_download_clicked')} download={outputName}>{t.download} ↓</a><button className="demo-reset" onClick={()=>setPhase(1)}>{t.back} ↗</button></div>}
       {error&&<div className="pptx-error-message" role="alert">{error}{!model&&<button onClick={openTemplate}>{t.retry}</button>}</div>}
     </div>
-    <DeckStudio locale={locale} model={model} patches={history.current} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} fileName={fileName}/>
+    {mode==='studio'&&<DeckStudio locale={locale} model={model} patches={history.current} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} fileName={fileName}/>}
     <dialog ref={exportDialogRef} className="pptx-export-confirm" aria-labelledby="export-confirm-title" onCancel={event=>{if(exporting)event.preventDefault()}}>
       <h3 id="export-confirm-title">{t.confirmExportTitle}</h3><p>{t.confirmExportHint}</p>
       {exportBlocked&&<p className="pptx-error" role="alert">{model?.mappingWarnings.length?t.mapping:t.validation}</p>}

@@ -35,6 +35,7 @@ export default function Landing({ locale }: { locale: Locale }) {
       <nav className="nav-bar" aria-label={locale === 'zh' ? '主导航' : 'Main navigation'}>
         <Link href={`/${locale}`} aria-label="SlideLatch"><Brand /></Link>
         <div className="nav-actions"><TrialButton locale={locale} source="header" className="nav-link nav-trial"/>
+          <Link href={`/${locale}/deck-studio`} className="language-switch">{t.navStudio}</Link>
           <a href="#workflow" className="nav-link">{t.navWorkflow}</a>
           <Link className="language-switch" href={locale === 'zh' ? '/en' : '/zh'} hrefLang={locale === 'zh' ? 'en' : 'zh-CN'} aria-label={t.languageLabel}>
             <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>
