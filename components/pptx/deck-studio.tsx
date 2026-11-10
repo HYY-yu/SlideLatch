@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import JSZip from 'jszip';
 import { parseStudioContent } from '@/lib/workflow/deck-input-text';
+import { locateDeckIssue } from '@/lib/workflow/deck-issue-location';
 import type { Locale } from '@/lib/i18n';
 import type { LoadedTemplate, Patches } from '@/lib/pptx/types';
 import { writePptx } from '@/lib/pptx/xml';
@@ -195,6 +196,17 @@ export default function DeckStudio(props: Props) {
     catch (cause) { if (current(task, version)) throw cause; }
     finally { finish(task); }
   }
+  async function locateIssue(issue:string) {
+    const loaded=sourceRef.current,checked=checkRef.current;
+    if(!loaded||!checked||checked.revision!==revision.current||!checked.issues.includes(issue))throw new Error(zh?'请先校验当前内容。':'Validate the current content first.');
+    const task=start('locate'),version=revision.current,input=deckRef.current;
+    try{
+      const location=await locateDeckIssue(loaded.template,input,issue,activeSlide);
+      if(!current(task,version)||sourceRef.current!==loaded)return;
+      if(!location)throw new Error(zh?'此问题没有可定位的成稿对象。':'This issue has no matching deck object.');
+      setActiveSlide(location.slideIndex);setSelectedKey(location.key);
+    }finally{finish(task);}
+  }
   async function generate() {
     const loaded = sourceRef.current, approved = checkRef.current;
     if (!loaded || !approved || approved.revision !== revision.current || approved.issues.length) throw new Error(zh ? '请先校验当前内容，并修复所有问题。' : 'Validate the current content and resolve every issue first.');
@@ -255,17 +267,7 @@ export default function DeckStudio(props: Props) {
       {selectedPage.lists.map(list => <div key={list.key}>{list.items.map((item,index) => <div key={item.itemIndex}>{item.components.filter(visible).map(node => field(node,selectedInput.lists?.[list.key]?.[index]?.[node.key],list.key,index))}</div>)}</div>)}
     </> : null;
     return props.render({source,deck,activeSlide,operation,error,notice,valid,check,download,bundle,selectedPage,previews,fields,selectedKey,candidates,candidateId,pageFilter,selectCandidate:setCandidateId,filterPages:setPageFilter,addPage:()=>void run(()=>{addSlide(candidateId);setSelectedKey(null)}),replacePage:()=>void run(()=>{replaceSlide(candidateId,activeSlide);setSelectedKey(null)}),
-      locateIssue:issue=>{
-        const indexed=/slides\[(\d+)\]/.exec(issue);
-        const currentPage=deck.slides[activeSlide];
-        const index=indexed?Number(indexed[1]):currentPage&&issue.includes(currentPage.templateId)?activeSlide:deck.slides.findIndex(slide=>issue.includes(slide.templateId));
-        const entry=deck.slides[index],page=source?.template.slides.find(slide=>slide.templateId===entry?.templateId);
-        if(!page)return;setActiveSlide(index);
-        const item=/\[(\d+)\]/.exec(issue.replace(/slides\[\d+\]/,''));
-        const tokens=issue.split(/[^A-Za-z_0-9]+/);
-        const component=page.nodes.find(node=>tokens.includes(node.key))??page.lists.flatMap(list=>list.items.filter((_,i)=>!item||i===Number(item[1])).flatMap(row=>row.components)).find(node=>tokens.includes(node.key));
-        setSelectedKey(component?`${page.slidePath}#${component.locator.shapeId}`:null);
-      },
+      locateIssue:issue=>void run(()=>locateIssue(issue)),
       selectObject:setSelectedKey,
       selectSlide:index=>{setActiveSlide(index);setSelectedKey(null)},
       createFromWorkspace:async()=>{let success=false;await run(async()=>{const result=await compileWorkspace(true);if(result){setSelectedKey(null);success=true}});return success;},
