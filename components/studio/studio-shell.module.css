@@ -28,7 +28,8 @@
 .viewTabs small{margin-left:5px;opacity:.6}
 .documentActions{display:flex;gap:6px}
 .workspace{display:grid;grid-template-columns:152px minmax(300px,1fr) 280px;flex:1;min-height:calc(100svh - 165px)}
-.workspace.withPanel{grid-template-columns:140px minmax(280px,1fr) 250px 340px}
+.workspace.withPanel{grid-template-columns:152px minmax(300px,1fr) 340px}
+.withPanel .inspector{display:none}
 .pages{padding:16px 12px;border-right:1px solid var(--studio-border);height:calc(100svh - 165px);overflow:auto;scrollbar-width:thin}
 .label{font-size:11px;color:var(--studio-muted);font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between}
 .pages>button,.draftPage>button{display:block;width:100%;margin:0 0 12px;padding:7px!important;text-align:left;border-radius:6px!important}
@@ -51,10 +52,10 @@
 .inspector :global(.pptx-properties){display:flex;flex-direction:column-reverse;max-height:none;height:auto;width:auto;border:0;background:#fff;padding:0}
 .inspector :global(.pptx-inspector-body){padding:22px 18px;overflow:visible;flex:none;max-height:none}
 .inspector :global(.pptx-objects-region){border-top:1px solid var(--studio-border);padding:16px 14px;flex:none;min-height:0;max-height:none}
-.inspector :global(.pptx-object-header){padding:0;gap:8px}
-.inspector :global(.pptx-object-header h3){font-size:11px;color:var(--studio-muted)}
-.inspector :global(.pptx-object-header label){font-size:10px;white-space:nowrap;margin:0}
-.inspector :global(.pptx-object-header input){width:auto}
+.inspector :global(.pptx-object-header){padding:0;gap:8px;align-items:center}
+.inspector :global(.pptx-object-header h3){font-size:11px;line-height:16px;color:var(--studio-muted)}
+.inspector :global(.pptx-object-header label){display:inline-flex;align-items:center;gap:6px;font-size:10px;line-height:16px;white-space:nowrap;margin:0}
+.inspector :global(.pptx-object-header input[type=checkbox]){width:12px;height:12px;padding:0;margin:0;flex:none}
 .inspector :global(.pptx-object-list){max-height:280px;padding-top:10px;overflow:auto}
 .inspector :global(.pptx-mark-heading){margin:0 0 10px}
 .inspector :global(.pptx-mark-heading h3){font-size:12px}
@@ -63,8 +64,6 @@
 .inspector :global(.pptx-remove-mark){font-size:11px}
 .inspector :global(.demo-label){font-size:11px;margin:12px 0 6px}
 .inspector :global(.text-length-controls){margin-top:14px}
-.content :global(.pptx-inspector-body) :global(.demo-label),.content :global(.pptx-inspector-body)>select,.content :global(.pptx-mark-heading),.content :global(.pptx-inspector-body)>:global(.coordinate-hint),.content :global(.pptx-length-controls),.content :global(.text-length-controls){display:none}
-.rules :global(.pptx-node-content){display:none}
 .issueList,.deckInspector{padding:20px 18px}
 .issueList>button{display:block;width:100%;text-align:left;overflow-wrap:anywhere;border-bottom:1px solid var(--studio-border)}
 .deckInspector textarea{min-height:70px;margin:4px 0 12px}
@@ -82,6 +81,15 @@
 .workflow select{margin:5px 0}
 .workflow input[type=number]{margin:5px 0;width:80px!important}
 .workflow details{font-size:11px;color:var(--studio-muted);margin:12px 0}
+.workflow>section>details{margin:0;border-top:1px solid var(--studio-border)}
+.workflow summary{padding:13px 0;cursor:pointer;font-size:12px;color:var(--studio-ink)}
+.workflow :global(.workflow-primary-actions){display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.workflow :global(.workflow-primary-actions) button{flex:1;min-width:100px;font-size:12px;padding:10px 8px}
+.workflow :global(.workflow-primary-action){background:var(--studio-accent);border-color:var(--studio-accent);color:#fff}
+.workflow :global(.workflow-primary-action):hover{background:#6146bb}
+.workflow :global(.workflow-tool-body){padding:0 0 16px}
+.workflow :global(.workflow-proposal) textarea{margin-top:0!important}
+.workflow :global(.workflow-tool-body) button{margin-right:5px!important}
 .workflow pre{font-size:10px;overflow-wrap:anywhere}
 .workflow textarea{font-size:11px}
 .workflow p{font-size:11px;overflow-wrap:anywhere}
@@ -110,7 +118,7 @@
 
 @media(max-width:800px){.workspace,.workspace.withPanel{grid-template-columns:100px minmax(0,1fr)}
 .inspector,.panel{grid-column:1/-1;height:auto;max-height:none;border-top:1px solid var(--studio-border);border-left:0}
-.workspace.withPanel .inspector{display:block}
+.workspace.withPanel .inspector{display:none}
 .pages,.stage{height:440px}
 .panel{max-height:600px}
 .header{flex-wrap:wrap}
@@ -147,6 +155,5 @@
 
 
 .studio input[type=checkbox]{width:auto}
-.content :global(.pptx-list-settings){display:none}
 .studio .brand{font-size:20px;font-weight:700}
 @media(max-width:800px){.studio .brand{font-size:18px}}

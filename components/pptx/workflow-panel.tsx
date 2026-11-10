@@ -116,18 +116,31 @@ export default function WorkflowPanel(props:Props){
   const status=snapshot?createWorkflowReview(snapshot,probes,observations).status:'loading';
   const statusLabel=allObserved&&status==='needs_review'?(zh?'边界样本已记录通过，导出后仍须编译门禁':'Boundary samples passed; export and compiler checks still required'):status;
   return <section aria-label={zh?'AI 辅助流程':'AI-assisted workflow'} style={{padding:24,borderTop:'1px solid #d4d4d8'}}>
-    <h3>{zh?'AI 辅助打标与边界审查':'AI-assisted marking and boundary review'}</h3>
-    <details><summary>{zh?'使用范围':'Scope'}</summary><p>{zh?'请求交给外部 AI，提案审查后应用。文件在浏览器处理。SVG 观察与原生 PowerPoint 验收分别记录。':'Hand requests to an external AI and review proposals before applying. Files are processed in this browser. SVG observations and native PowerPoint review are separate.'}</p></details>
-    <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'12px 0'}}>
-      <button disabled={disabled} onClick={()=>void run(async()=>json(await inspect(),'workspace-inspection.json'))}>{zh?'导出 AI 检查清单':'Export AI inspection'}</button>
-      <button disabled={disabled} onClick={()=>void run(()=>json({schemaVersion:1,templateSha256:snapshot!.templateSha256,snapshotId:snapshot!.snapshotId,marks:[]},'mark-proposal.json'))}>{zh?'导出建议格式':'Export proposal format'}</button>
+    <div className="workflow-primary-actions">
+      <button className="workflow-primary-action" disabled={disabled} onClick={()=>void run(()=>json(recognitionRequest(),'recognition-request.json'))}>{zh?'导出 AI 请求':'Export AI request'}</button>
+      <button disabled={disabled} onClick={()=>proposalFile.current?.click()}>{zh?'导入提案':'Import proposal'}</button>
     </div>
-    <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'12px 0'}}>
-      <button disabled={disabled} onClick={()=>void run(localRecognition)}>{zh?'生成本地规则候选（不自动应用）':'Generate local rule candidates (no automatic application)'}</button>
-      <button disabled={disabled} onClick={()=>void run(()=>json(recognitionRequest(),'recognition-request.json'))}>{zh?'导出模型中立识别请求':'Export provider-neutral recognition request'}</button>
-    </div>
-    {recognition&&<details><summary>{zh?'查看规则候选与限制':'Rule candidates and limitations'}</summary><pre style={{maxHeight:260,overflow:'auto',whiteSpace:'pre-wrap'}}>{JSON.stringify(recognition,null,2)}</pre></details>}
-    <fieldset style={{margin:'20px 0',padding:16}}><legend>{zh?'自动测量当前页文本容量':'Automatically measure current-slide text capacity'}</legend>
+    <input ref={proposalFile} type="file" accept=".json,application/json" hidden onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void run(async()=>{if(file.size>1_000_000)throw new Error('PROPOSAL_SIZE_LIMIT');setProposal(await file.text());setReviewed(null)})}}/>
+    <details className="workflow-proposal" open={!!proposal}><summary>{proposal?(zh?'提案内容':'Proposal content'):(zh?'粘贴 JSON':'Paste JSON')}</summary>
+      <label htmlFor="workflow-proposal">{zh?'提案 JSON':'Proposal JSON'}</label>
+      <textarea id="workflow-proposal" rows={5} value={proposal} onChange={event=>setProposal(event.target.value)} style={{display:'block',width:'100%',fontFamily:'monospace',margin:'8px 0'}}/>
+    <button disabled={disabled||!proposal.trim()} onClick={()=>void run(async()=>{
+      assertCurrent();if(proposal.length>1_000_000)throw new Error('PROPOSAL_SIZE_LIMIT');
+      const next=await applyMarkProposal(model,patches,snapshot!,JSON.parse(proposal));assertCurrent();
+      const changes=Object.entries(next).filter(([key,patch])=>JSON.stringify(patch)!==JSON.stringify(patches[key])).map(([key,patch])=>({key,before:patches[key]?.name??model.slides.flatMap(slide=>slide.nodes).find(node=>node.key===key)?.name??'',after:patch.name??JSON.stringify(patch.pageContract)}));
+      setReviewed({text:proposal,snapshotId:snapshot!.snapshotId,changes});
+    })}>{zh?'审查提案':'Review proposal'}</button>
+    </details>
+    {reviewed&&reviewed.text===proposal&&reviewed.snapshotId===snapshot?.snapshotId&&<div aria-label={zh?'提案变更':'Proposal changes'}><p>{reviewed.changes.length} {zh?'项变更':'changes'}</p>{reviewed.changes.map(change=><div key={change.key} style={{padding:'10px 0',borderBottom:'1px solid #e6e4ed',overflowWrap:'anywhere'}}><small>{change.key}</small><p><del>{change.before}</del></p><p>{change.after}</p></div>)}<button disabled={disabled||!reviewed.changes.length} onClick={()=>void run(()=>applyProposal(JSON.parse(reviewed.text)))}>{zh?'应用已审查提案':'Apply reviewed proposal'}</button><button onClick={()=>{setReviewed(null);setProposal('')}}>{zh?'拒绝提案':'Reject proposal'}</button></div>}
+    <details data-workflow-tool="boundaries"><summary>{zh?'边界审查':'Boundary review'}</summary><div className="workflow-tool-body">
+    <div style={{marginTop:20}}><label htmlFor="workflow-probe">{zh?'预览最小 / 最大边界':'Preview minimum / maximum boundaries'}</label><select id="workflow-probe" disabled={disabled} value={active??''} onChange={event=>void run(()=>previewProbe(event.target.value))} style={{display:'block',maxWidth:'100%',margin:'8px 0'}}><option value="" disabled>{zh?'选择边界案例':'Choose a boundary case'}</option>{probes.map(probe=><option key={probe.id} value={probe.id}>{probe.slideIndex+1} · {probe.key} · {probe.boundary} = {probe.value}</option>)}</select>
+    {!probes.length&&<p>{zh?'先为文本或动态列表添加有效标记，再生成边界案例。':'Add valid text or dynamic-list marks to generate boundary cases.'}</p>}
+    {active&&<><p>{probes.find(probe=>probe.id===active)?.limitation}</p><label htmlFor="workflow-reason">{zh?'目视检查依据（必填）':'Visual review reason (required)'}</label><textarea id="workflow-reason" value={reason} onChange={event=>setReason(event.target.value)} maxLength={4000} rows={2} style={{display:'block',width:'100%',margin:'8px 0'}}/>{(['pass','fail'] as const).map(verdict=><button key={verdict} disabled={disabled||!reason.trim()} onClick={()=>void run(()=>recordObservation({probeId:active,snapshotId:snapshot!.snapshotId,verdict,reason}))} style={{marginRight:12}}>{verdict==='pass'?(zh?'记录通过':'Record pass'):(zh?'记录失败':'Record fail')}</button>)}<button onClick={()=>{setActive(null);activeRef.current=null;onPreview(null)}}>{zh?'恢复实际内容':'Restore actual content'}</button></>}
+    <p aria-live="polite">{zh?'已记录':'Recorded'} {observations.length} / {probes.length} · {statusLabel}</p></div>
+    <button disabled={disabled} onClick={()=>void run(release)}>{zh?'导出审查包（标记 PPTX + 审查 JSON）':'Export review bundle (marked PPTX + review JSON)'}</button>
+    <p>{zh?'导出不代表审查通过。编译门禁由审查 JSON 的状态决定；失败或未检查的案例会阻止发布。':'Export does not mean review passed. The review JSON determines the compile gate; failed or unreviewed cases block release.'}</p>
+    </div></details>
+    <details data-workflow-tool="capacity"><summary>{zh?'容量测量':'Text capacity'}</summary><div className="workflow-tool-body">
       <details><summary>{zh?'测量说明':'Measurement details'}</summary><p>{zh?'只测普通、未旋转、非列表的页级文本。从长度 1 开始逐个候选在实际 SVG 编辑器中渲染并测量 3 种压力文本（1 仅为搜索起点）。结果仅为预览容量候选，不推断语义最小值，不修改标记或代替目视审查。':'Only ordinary, unrotated, non-list page text is supported. Starting at length 1 (a search start only), each candidate is rendered in the actual SVG editor and measured with 3 stress strings. Results are preview capacity candidates, not semantic minimums, marker edits, or visual approval.'}</p></details>
       <label>{zh?'文本对象 ':'Text node '}<select disabled={disabled} value={capacityKey} onChange={event=>{setCapacityKey(event.target.value);setCapacityReport(null);reportRef.current=null;setProgress(0);}}><option value="">{zh?'选择当前页文本':'Choose current-slide text'}</option>{eligibleNodes.map(node=><option key={node.key} value={node.key}>{node.key} · {node.name}</option>)}</select></label>
       <label style={{marginLeft:12}}>{zh?'搜索上限（1–128） ':'Search ceiling (1–128) '}<input type="number" min={1} max={128} value={capacityUpper} disabled={disabled} onChange={event=>setCapacityUpper(Number(event.target.value))} style={{width:75}}/></label>
@@ -135,30 +148,20 @@ export default function WorkflowPanel(props:Props){
       {capacityRunning&&<button onClick={cancelCapacity}>{zh?'取消并恢复内容':'Cancel and restore content'}</button>}
       <p aria-live="polite">{zh?'已测量压力样本':'Stress samples measured'}: {progress} / {capacityUpper*3}</p>
       {capacityReport&&<><p><strong>{zh?'候选最大值':'Candidate maximum'}: {capacityReport.recommendedMax??(zh?'无可靠候选':'No reliable candidate')} · {capacityReport.status}</strong></p><p>{zh?'测量完成。候选上限与失败样本详见报告；工作区修改会使结果失效。':'Measurement finished. See the report for status, candidate ceiling and failing samples. Editor changes invalidate this result.'}</p>{capacityReport.recommendedMax!==null&&<div><label>{zh?'语义最小字数（需明确指定） ':'Semantic minimum (explicit input required) '}<input type="number" min={0} max={capacityReport.recommendedMax} value={capacityMinimum} onChange={event=>setCapacityMinimum(event.target.value)} style={{width:80}}/></label><button disabled={disabled||capacityMinimum===''} onClick={()=>void run(()=>proposeMeasuredRange(Number(capacityMinimum)))}>{zh?'用测量结果生成标记提案（不自动应用）':'Prepare a measured-range proposal (no automatic application)'}</button></div>}<button onClick={()=>json(capacityReport,'text-capacity-report.json')}>{zh?'导出容量候选报告':'Export capacity candidate report'}</button><details open><summary>{zh?'测量报告':'Measurement report'}</summary><pre style={{maxHeight:300,overflow:'auto',whiteSpace:'pre-wrap'}}>{JSON.stringify(capacityReport,null,2)}</pre></details></>}
-    </fieldset>
-    <fieldset style={{margin:'20px 0',padding:16}}><legend>{zh?'当前页类型与顺序逻辑':'Current-page type and ordered logic'}</legend>
+    </div></details>
+    <details data-workflow-tool="page"><summary>{zh?'页面规则':'Page rules'}</summary><div className="workflow-tool-body">
       <details><summary>{zh?'页面合同说明':'Page contract details'}</summary><p>{zh?'明确确认后写入页面契约，保留原有讲者备注。每行填写一条顺序逻辑；规则猜测不会自动应用。':'Explicitly apply a page contract while preserving existing speaker notes. Enter one ordered logic step per line. Rule guesses are not applied automatically.'}</p></details>
       <label>{zh?'页面类型 ':'Page type '}<select value={pageType} disabled={disabled} onChange={event=>setPageType(event.target.value)}>{['封面页','目录页','章节过渡页','内容页','结尾页'].map(type=><option key={type} value={type}>{type}</option>)}</select></label>
       <label style={{display:'block'}}>{zh?'顺序逻辑（每行一步）':'Ordered logic (one step per line)'}<textarea rows={3} maxLength={12000} disabled={disabled} value={pageLogic} onChange={event=>setPageLogic(event.target.value)} style={{display:'block',width:'100%'}}/></label>
       <button disabled={disabled} onClick={()=>void run(()=>applyProposal({schemaVersion:1,templateSha256:snapshot!.templateSha256,snapshotId:snapshot!.snapshotId,pages:[{path:snapshot!.slides[props.currentSlideIndex].path,pageType,logic:pageLogic.split('\n').map(line=>line.trim()).filter(Boolean),reason:'Explicit page contract entered and confirmed in the editor.'}]}))}>{zh?'验证并应用当前页契约':'Validate and apply current-page contract'}</button>
-    </fieldset>
-    <label htmlFor="workflow-proposal">{zh?'AI 建议 JSON（每条 marks 包含 key、name、reason）':'AI proposal JSON (each marks entry contains key, name, reason)'}</label>
-    <textarea id="workflow-proposal" rows={5} value={proposal} onChange={event=>setProposal(event.target.value)} style={{display:'block',width:'100%',fontFamily:'monospace',margin:'8px 0'}}/>
-    <input ref={proposalFile} type="file" accept=".json,application/json" hidden onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void run(async()=>{if(file.size>1_000_000)throw new Error('PROPOSAL_SIZE_LIMIT');setProposal(await file.text());setReviewed(null)})}}/>
-    <button disabled={disabled} onClick={()=>proposalFile.current?.click()}>{zh?'选择提案 JSON':'Choose proposal JSON'}</button>
-    <button disabled={disabled||!proposal.trim()} onClick={()=>void run(async()=>{
-      assertCurrent();if(proposal.length>1_000_000)throw new Error('PROPOSAL_SIZE_LIMIT');
-      const next=await applyMarkProposal(model,patches,snapshot!,JSON.parse(proposal));assertCurrent();
-      const changes=Object.entries(next).filter(([key,patch])=>JSON.stringify(patch)!==JSON.stringify(patches[key])).map(([key,patch])=>({key,before:patches[key]?.name??model.slides.flatMap(slide=>slide.nodes).find(node=>node.key===key)?.name??'',after:patch.name??JSON.stringify(patch.pageContract)}));
-      setReviewed({text:proposal,snapshotId:snapshot!.snapshotId,changes});
-    })}>{zh?'审查提案':'Review proposal'}</button>
-    {reviewed&&reviewed.text===proposal&&reviewed.snapshotId===snapshot?.snapshotId&&<div aria-label={zh?'提案变更':'Proposal changes'}><p>{reviewed.changes.length} {zh?'项变更':'changes'}</p>{reviewed.changes.map(change=><div key={change.key} style={{padding:'10px 0',borderBottom:'1px solid #e6e4ed',overflowWrap:'anywhere'}}><small>{change.key}</small><p><del>{change.before}</del></p><p>{change.after}</p></div>)}<button disabled={disabled||!reviewed.changes.length} onClick={()=>void run(()=>applyProposal(JSON.parse(reviewed.text)))}>{zh?'应用已审查提案':'Apply reviewed proposal'}</button><button onClick={()=>{setReviewed(null);setProposal('')}}>{zh?'拒绝提案':'Reject proposal'}</button></div>}
-    <div style={{marginTop:20}}><label htmlFor="workflow-probe">{zh?'预览最小 / 最大边界':'Preview minimum / maximum boundaries'}</label><select id="workflow-probe" disabled={disabled} value={active??''} onChange={event=>void run(()=>previewProbe(event.target.value))} style={{display:'block',maxWidth:'100%',margin:'8px 0'}}><option value="" disabled>{zh?'选择边界案例':'Choose a boundary case'}</option>{probes.map(probe=><option key={probe.id} value={probe.id}>{probe.slideIndex+1} · {probe.key} · {probe.boundary} = {probe.value}</option>)}</select>
-    {!probes.length&&<p>{zh?'先为文本或动态列表添加有效标记，再生成边界案例。':'Add valid text or dynamic-list marks to generate boundary cases.'}</p>}
-    {active&&<><p>{probes.find(probe=>probe.id===active)?.limitation}</p><label htmlFor="workflow-reason">{zh?'目视检查依据（必填）':'Visual review reason (required)'}</label><textarea id="workflow-reason" value={reason} onChange={event=>setReason(event.target.value)} maxLength={4000} rows={2} style={{display:'block',width:'100%',margin:'8px 0'}}/>{(['pass','fail'] as const).map(verdict=><button key={verdict} disabled={disabled||!reason.trim()} onClick={()=>void run(()=>recordObservation({probeId:active,snapshotId:snapshot!.snapshotId,verdict,reason}))} style={{marginRight:12}}>{verdict==='pass'?(zh?'记录通过':'Record pass'):(zh?'记录失败':'Record fail')}</button>)}<button onClick={()=>{setActive(null);activeRef.current=null;onPreview(null)}}>{zh?'恢复实际内容':'Restore actual content'}</button></>}
-    <p aria-live="polite">{zh?'已记录':'Recorded'} {observations.length} / {probes.length} · {statusLabel}</p></div>
-    <button disabled={disabled} onClick={()=>void run(release)}>{zh?'导出审查包（标记 PPTX + 审查 JSON）':'Export review bundle (marked PPTX + review JSON)'}</button>
-    <p>{zh?'导出不代表审查通过。编译门禁由审查 JSON 的状态决定；失败或未检查的案例会阻止发布。':'Export does not mean review passed. The review JSON determines the compile gate; failed or unreviewed cases block release.'}</p>
+    </div></details>
+    <details data-workflow-tool="more"><summary>{zh?'更多工具':'More tools'}</summary><div className="workflow-tool-body">
+      <button disabled={disabled} onClick={()=>void run(async()=>json(await inspect(),'workspace-inspection.json'))}>{zh?'导出检查清单':'Export inspection'}</button>
+      <button disabled={disabled} onClick={()=>void run(()=>json({schemaVersion:1,templateSha256:snapshot!.templateSha256,snapshotId:snapshot!.snapshotId,marks:[]},'mark-proposal.json'))}>{zh?'导出提案格式':'Export proposal format'}</button>
+      <button disabled={disabled} onClick={()=>void run(localRecognition)}>{zh?'生成本地规则候选':'Generate local rule candidates'}</button>
+      {recognition&&<details><summary>{zh?'规则候选与限制':'Rule candidates and limitations'}</summary><pre style={{maxHeight:260,overflow:'auto',whiteSpace:'pre-wrap'}}>{JSON.stringify(recognition,null,2)}</pre></details>}
+      <p>{zh?'本地候选不自动应用。请求交给外部 AI，提案审查后应用。':'Local candidates are not applied automatically. Hand requests to an external AI, then review its proposal.'}</p>
+    </div></details>
     {error&&<p role="alert" className="pptx-error">{error}</p>}
   </section>;
 }
