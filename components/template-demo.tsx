@@ -13,7 +13,6 @@ import { markError, markName, parseMark, type Mark } from '@/lib/pptx/dsl';
 import type { Box, LoadedTemplate, Patches, SourceNode } from '@/lib/pptx/types';
 import SvgSlide from './pptx/svg-slide';
 import WorkflowController from './pptx/workflow-controller';
-import DeckStudio from './pptx/deck-studio';
 import StudioShell from './studio/studio-shell';
 import { locateAuthorIssue } from '@/lib/workflow/studio-issue';
 import type { BoundaryProbe } from '@/lib/workflow/session';
@@ -29,7 +28,6 @@ import { addedMarkName, allowedMarkTypes, removedMarkName } from '@/lib/pptx/mar
 const emptyHistory={past:[] as Patches[],current:{} as Patches,future:[] as Patches[]};
 export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'demo'|'studio'}) {
   const t=editorCopy[locale],template=locale==='en'?templateEn:templateZh;
-  const [studioView,setStudioView]=useState<'template'|'deck'>('template');
   const [baseModel,setModel]=useState<LoadedTemplate|null>(null),[phase,setPhase]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState('');
   const [page,setPage]=useState(0),[selected,setSelected]=useState<string|null>(null),[markedOnly,setMarkedOnly]=useState(false);
   const [history,setHistory]=useState(emptyHistory),[transient,setTransient]=useState<Patches|null>(null);
@@ -294,9 +292,9 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
               <button className="pptx-apply" disabled={draftInvalid||(nameDraft===currentName&&!contentDirty)} onClick={()=>updateNode({name:nameDraft,...(contentDirty?{text:nodeContent}:{})})}>{t.apply} ✓</button></>}</>}
             </section>:<section className="pptx-inspector-body" aria-label={t.mark}><h3>{t.mark}</h3><p className="pptx-empty">{t.select}</p></section>}
           </aside>) : null;
-  if(mode==='studio')return <>{model&&<WorkflowController editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])} svgRef={svgRef} onCapacityPreview={setCapacityPreview} key={fileSession} model={model} patches={history.current} fileName={fileName} visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page} busy={studioView==='deck'||loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}} onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}} onError={setError}/>}<DeckStudio locale={locale} model={model} patches={history.current} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} fileName={fileName} render={deck=><StudioShell
-    locale={locale} view={studioView} onView={view=>{setStudioView(view);setWorkflowPreview(null);setCapacityPreview(null);setPreviewLengths({});setListPreviews({});}} model={model} fileName={fileName} loading={loading} busy={exporting||!!transient||!!groupMode} error={error}
-    page={page} committedPatches={history.current} textPreviews={textPreviews} deck={deck}
+  if(mode==='studio')return <>{model&&<WorkflowController editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])} svgRef={svgRef} onCapacityPreview={setCapacityPreview} key={fileSession} model={model} patches={history.current} fileName={fileName} visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}} onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}} onError={setError}/>}<StudioShell
+    locale={locale} model={model} fileName={fileName} loading={loading} busy={exporting||!!transient||!!groupMode} error={error}
+    page={page} committedPatches={history.current} textPreviews={textPreviews}
     properties={properties} onLocateIssue={issue=>{const target=model?locateAuthorIssue(model.slides,issue):null;if(target){changePage(target.page);if(target.key)selectObject(target.key)}}} onPage={changePage} onOpen={()=>inputRef.current?.click()} onRetry={openTemplate}
     input={<input ref={inputRef} type="file" accept=".pptx" hidden aria-label={locale==='zh'?'选择本地 PPTX':'Choose local PPTX'} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void openLocalFile(file)}}/>}
     canvas={model&&<SvgSlide model={model} slideIndex={page} patches={patches} selected={groupMode?null:selected} selectedMembers={groupMode?.keys} interactive onSelect={selectObject} onSelectItem={selectListItem} onDrag={drag} svgRef={svgRef} locale={locale} textPreviews={textPreviews} listPreviews={workflowPreview?.kind==='list'&&workflowPreview.listKey?{[workflowPreview.listKey]:workflowPreview.value}:listPreviews} onListPreview={previewList}/>}
@@ -304,7 +302,7 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
     issues={model?[...model.mappingWarnings,...exportIssues.map(issueText)]:[]}
     onExport={()=>void exportTemplate(pendingExportPatches)} exportBlocked={!!exportBlocked||!!groupMode||!!transient||exporting} exporting={exporting}
     download={download?{url:download,name:outputName,report:exportReport}:null}
-  />}/></>;
+  /></>;
   return <section id="demo" className="demo-wrap interactive-demo pptx-workbench reveal" aria-labelledby="demo-title">
     <div id="workflow" className="demo-intro"><h2 id="demo-title">{t.title}</h2><p>{t.note}</p></div>
     <div className="demo-workspace">
