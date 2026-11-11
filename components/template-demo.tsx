@@ -12,8 +12,9 @@ import { boxFor, inverse, parentMatrix, point, worldFrame } from '@/lib/pptx/geo
 import { markError, markName, parseMark, type Mark } from '@/lib/pptx/dsl';
 import type { Box, LoadedTemplate, Patches, SourceNode } from '@/lib/pptx/types';
 import SvgSlide from './pptx/svg-slide';
-import WorkflowPanel from './pptx/workflow-panel';
-import DeckStudio from './pptx/deck-studio';
+import WorkflowController from './pptx/workflow-controller';
+import StudioShell from './studio/studio-shell';
+import { locateAuthorIssue } from '@/lib/workflow/studio-issue';
 import type { BoundaryProbe } from '@/lib/workflow/session';
 import ListObjects from './pptx/list-objects';
 import ListSettings from './pptx/list-settings';
@@ -174,6 +175,7 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
       if(version===loadVersion.current)installTemplate(result,file.name);
     }catch(cause){if(version===loadVersion.current){console.error('[SlideLatch] local.load.failed',cause);setError(locale==='zh'?'无法读取此 PPTX。请选择有效的 .pptx 文件（最多 50 MB、200 页，解压后最多 200 MB）。原有编辑已保留。':'Could not read this PPTX. Choose a valid .pptx (up to 50 MB, 200 slides, 200 MB expanded). Existing edits are preserved.');}}finally{if(version===loadVersion.current)setLoading(false);}
   }
+  useEffect(()=>{if(mode==='studio')void openTemplate();return()=>{loadVersion.current++}},[mode,locale]);
   function addMark(){
     if(!node||!source)return;
     const name=addedMarkName(node,source.nodes,history.current);
@@ -267,30 +269,11 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
       if(check.length!==model.slides.length)throw new Error('EXPORT_SLIDE_COUNT');
       if(downloadRef.current)URL.revokeObjectURL(downloadRef.current);
       const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'}));downloadRef.current=url;setDownload(url);
-      setExportReport(`${check.length} ${locale==='zh'?'页':'slides'} · ${count} ${t.changed}`);setPhase(2);exportDialogRef.current?.close();
+      setExportReport(`${check.length} ${locale==='zh'?'页':'slides'} · ${count} ${t.changed}`);setPhase(mode==='studio'?1:2);exportDialogRef.current?.close();
       track('workbench_export_succeeded');console.info('[SlideLatch] template.export.complete',{slides:check.length,patches:count,bytes:bytes.byteLength});
     }catch(cause){track('workbench_export_failed',{reason:'write_failed'});console.error('[SlideLatch] template.export.failed',cause);setError(t.error);}finally{setExporting(false);}
   }
-  return <section id="demo" className="demo-wrap interactive-demo pptx-workbench reveal" aria-labelledby="demo-title">
-    <div id="workflow" className="demo-intro"><h2 id="demo-title">{t.title}</h2><p>{t.note}</p></div>
-    <div className="demo-workspace">
-      {mode==='studio'&&<><input ref={inputRef} type="file" accept=".pptx" hidden aria-label={locale==='zh'?'选择本地 PPTX':'Choose local PPTX'} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void openLocalFile(file)}}/>
-      <div className="pptx-toolbar"><button type="button" className="button button-secondary" disabled={loading||exporting||!!transient||!!groupMode} onClick={()=>inputRef.current?.click()}>{loading?t.loading:locale==='zh'?'打开本地 PPTX':'Open local PPTX'}</button><small>{locale==='zh'?'仅在浏览器中处理，不上传文件。最多 50 MB / 200 页。':'Processed in this browser, never uploaded. Up to 50 MB / 200 slides.'}</small></div></>}
-      <ol className="demo-stepper" aria-label={t.title}>{t.steps.map((label,i)=><li key={label}><button type="button" disabled={exporting||i>0&&!model} aria-current={phase===i?'step':undefined} onClick={()=>changeStep(i)}><span>{i<phase?'✓':`0${i+1}`}</span>{label}</button></li>)}</ol>
-      {phase===0&&<div className="pptx-choose"><div><img src={template.overview} alt={t.overview}/></div><aside><p className="eyebrow">01</p><h3>{t.template}</h3><p>{t.chooseHint}</p><button className="button button-primary" onClick={openTemplate} disabled={loading}>{loading?t.loading:t.choose}<span aria-hidden="true">→</span></button></aside></div>}
-      {phase===1&&model&&source&&<>
-        <div className="pptx-toolbar"><div><strong>{fileName||t.template}</strong><span>{page+1} / {model.slides.length}</span><button onClick={()=>overviewRef.current?.showModal()}>{t.preview} ↗</button></div><button className="pptx-next-step" disabled={exporting} onClick={()=>changeStep(2)}>{t.nextStep} <span aria-hidden="true">→</span></button></div>
-        <div className="pptx-editor-layout">
-          <nav className="pptx-thumbnails" aria-label={locale==='zh'?'PPT 页面列表':'Slide list'}>{model.slides.map((slide,i)=><button key={slide.path} className={page===i?'active':''} onClick={()=>changePage(i)} aria-label={`${t.page} ${i+1}`} aria-current={page===i?'page':undefined}><span className="thumb-number">{String(i+1).padStart(2,'0')}</span><SvgSlide model={model} slideIndex={i} patches={history.current} locale={locale} textPreviews={textPreviews}/></button>)}</nav>
-          <div className="pptx-stage"><div className="pptx-canvas-actions" role="toolbar" aria-label={t.operations}>
-            <button disabled={!history.past.length} onClick={undo} title={`${t.undo} (⌘Z / Ctrl+Z)`} aria-keyshortcuts="Meta+z Control+z">↶ {t.undo}</button>
-            <button disabled={!history.future.length} onClick={redo} title={`${t.redo} (⇧⌘Z / Ctrl+Y / Ctrl+Shift+Z)`} aria-keyshortcuts="Meta+Shift+z Control+y Control+Shift+z">↷ {t.redo}</button>
-            <span className="action-divider" aria-hidden="true"/>
-            <button disabled={!node||!history.current[node.key]?.box} onClick={resetPosition}>{t.resetPosition}</button>
-            <button disabled={!patchCount&&!Object.keys(listPreviews).length&&!Object.keys(previewLengths).length&&!contentDirty&&nameDraft===currentName} onClick={resetAll}>{t.resetAll}</button>
-            <span className="canvas-patch-count">{patchCount} {t.changed}</span>
-          </div><div className="pptx-canvas"><SvgSlide model={model} slideIndex={page} patches={patches} selected={groupMode?null:selected} selectedMembers={groupMode?.keys} interactive onSelect={selectObject} onSelectItem={selectListItem} onDrag={drag} svgRef={svgRef} locale={locale} textPreviews={textPreviews} listPreviews={workflowPreview?.kind==='list'&&workflowPreview.listKey?{[workflowPreview.listKey]:workflowPreview.value}:listPreviews} onListPreview={previewList}/></div><div className="pptx-stage-status"><span className="pptx-status-identity">{t.page} {page+1}</span><span className="pptx-status-hint">{t.readonly}</span><span className="pptx-status-dimensions">{Math.round(model.deck.size.width)} × {Math.round(model.deck.size.height)} pt</span></div></div>
-          <aside className="pptx-properties">
+  const properties = model && source ? (<aside className="pptx-properties">
             <section className="pptx-objects-region" aria-label={t.objects}>
             <div className="pptx-object-header"><h3>{t.objects}</h3><label><input type="checkbox" checked={markedOnly} onChange={e=>setMarkedOnly(e.target.checked)}/>{t.markedOnly}</label></div>
             <div className="pptx-object-list" ref={objectListRef}><ListObjects nodes={source.nodes} lists={lists} patches={history.current} selected={selected} markedOnly={markedOnly} onSelect={selectObject} onSelectItem={selectListItem} selectedRef={selectedObjectRef} locale={locale}/></div>
@@ -308,15 +291,42 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
               {draftInvalid&&<p className="pptx-error" role="alert">{t.invalidMark}</p>}
               <button className="pptx-apply" disabled={draftInvalid||(nameDraft===currentName&&!contentDirty)} onClick={()=>updateNode({name:nameDraft,...(contentDirty?{text:nodeContent}:{})})}>{t.apply} ✓</button></>}</>}
             </section>:<section className="pptx-inspector-body" aria-label={t.mark}><h3>{t.mark}</h3><p className="pptx-empty">{t.select}</p></section>}
-          </aside>
+          </aside>) : null;
+  if(mode==='studio')return <>{model&&<WorkflowController editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])} svgRef={svgRef} onCapacityPreview={setCapacityPreview} key={fileSession} model={model} patches={history.current} fileName={fileName} visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}} onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}} onError={setError}/>}<StudioShell
+    locale={locale} model={model} fileName={fileName} loading={loading} busy={exporting||!!transient||!!groupMode} error={error}
+    page={page} committedPatches={history.current} textPreviews={textPreviews}
+    properties={properties} onLocateIssue={issue=>{const target=model?locateAuthorIssue(model.slides,issue):null;if(target){changePage(target.page);if(target.key)selectObject(target.key)}}} onPage={changePage} onOpen={()=>inputRef.current?.click()} onRetry={openTemplate}
+    input={<input ref={inputRef} type="file" accept=".pptx" hidden aria-label={locale==='zh'?'选择本地 PPTX':'Choose local PPTX'} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void openLocalFile(file)}}/>}
+    canvas={model&&<SvgSlide model={model} slideIndex={page} patches={patches} selected={groupMode?null:selected} selectedMembers={groupMode?.keys} interactive onSelect={selectObject} onSelectItem={selectListItem} onDrag={drag} svgRef={svgRef} locale={locale} textPreviews={textPreviews} listPreviews={workflowPreview?.kind==='list'&&workflowPreview.listKey?{[workflowPreview.listKey]:workflowPreview.value}:listPreviews} onListPreview={previewList}/>}
+    actions={<><button disabled={!history.past.length||exporting} onClick={undo}>↶ {t.undo}</button><button disabled={!history.future.length||exporting} onClick={redo}>↷ {t.redo}</button><button disabled={!node||!history.current[node.key]?.box||exporting} onClick={resetPosition}>{t.resetPosition}</button><button disabled={(!patchCount&&!Object.keys(listPreviews).length&&!Object.keys(previewLengths).length&&!contentDirty&&nameDraft===currentName)||exporting} onClick={resetAll}>{t.resetAll}</button></>}
+    issues={model?[...model.mappingWarnings,...exportIssues.map(issueText)]:[]}
+    onExport={()=>void exportTemplate(pendingExportPatches)} exportBlocked={!!exportBlocked||!!groupMode||!!transient||exporting} exporting={exporting}
+    download={download?{url:download,name:outputName,report:exportReport}:null}
+  /></>;
+  return <section id="demo" className="demo-wrap interactive-demo pptx-workbench reveal" aria-labelledby="demo-title">
+    <div id="workflow" className="demo-intro"><h2 id="demo-title">{t.title}</h2><p>{t.note}</p></div>
+    <div className="demo-workspace">
+      <ol className="demo-stepper" aria-label={t.title}>{t.steps.map((label,i)=><li key={label}><button type="button" disabled={exporting||i>0&&!model} aria-current={phase===i?'step':undefined} onClick={()=>changeStep(i)}><span>{i<phase?'✓':`0${i+1}`}</span>{label}</button></li>)}</ol>
+      {phase===0&&<div className="pptx-choose"><div><img src={template.overview} alt={t.overview}/></div><aside><p className="eyebrow">01</p><h3>{t.template}</h3><p>{t.chooseHint}</p><button className="button button-primary" onClick={openTemplate} disabled={loading}>{loading?t.loading:t.choose}<span aria-hidden="true">→</span></button></aside></div>}
+      {phase===1&&model&&source&&<>
+        <div className="pptx-toolbar"><div><strong>{fileName||t.template}</strong><span>{page+1} / {model.slides.length}</span><button onClick={()=>overviewRef.current?.showModal()}>{t.preview} ↗</button></div><button className="pptx-next-step" disabled={exporting} onClick={()=>changeStep(2)}>{t.nextStep} <span aria-hidden="true">→</span></button></div>
+        <div className="pptx-editor-layout">
+          <nav className="pptx-thumbnails" aria-label={locale==='zh'?'PPT 页面列表':'Slide list'}>{model.slides.map((slide,i)=><button key={slide.path} className={page===i?'active':''} onClick={()=>changePage(i)} aria-label={`${t.page} ${i+1}`} aria-current={page===i?'page':undefined}><span className="thumb-number">{String(i+1).padStart(2,'0')}</span><SvgSlide model={model} slideIndex={i} patches={history.current} locale={locale} textPreviews={textPreviews}/></button>)}</nav>
+          <div className="pptx-stage"><div className="pptx-canvas-actions" role="toolbar" aria-label={t.operations}>
+            <button disabled={!history.past.length} onClick={undo} title={`${t.undo} (⌘Z / Ctrl+Z)`} aria-keyshortcuts="Meta+z Control+z">↶ {t.undo}</button>
+            <button disabled={!history.future.length} onClick={redo} title={`${t.redo} (⇧⌘Z / Ctrl+Y / Ctrl+Shift+Z)`} aria-keyshortcuts="Meta+Shift+z Control+y Control+Shift+z">↷ {t.redo}</button>
+            <span className="action-divider" aria-hidden="true"/>
+            <button disabled={!node||!history.current[node.key]?.box} onClick={resetPosition}>{t.resetPosition}</button>
+            <button disabled={!patchCount&&!Object.keys(listPreviews).length&&!Object.keys(previewLengths).length&&!contentDirty&&nameDraft===currentName} onClick={resetAll}>{t.resetAll}</button>
+            <span className="canvas-patch-count">{patchCount} {t.changed}</span>
+          </div><div className="pptx-canvas"><SvgSlide model={model} slideIndex={page} patches={patches} selected={groupMode?null:selected} selectedMembers={groupMode?.keys} interactive onSelect={selectObject} onSelectItem={selectListItem} onDrag={drag} svgRef={svgRef} locale={locale} textPreviews={textPreviews} listPreviews={workflowPreview?.kind==='list'&&workflowPreview.listKey?{[workflowPreview.listKey]:workflowPreview.value}:listPreviews} onListPreview={previewList}/></div><div className="pptx-stage-status"><span className="pptx-status-identity">{t.page} {page+1}</span><span className="pptx-status-hint">{t.readonly}</span><span className="pptx-status-dimensions">{Math.round(model.deck.size.width)} × {Math.round(model.deck.size.height)} pt</span></div></div>
+          {properties}
         </div>
-        {mode==='studio'&&<WorkflowPanel editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])} svgRef={svgRef} onCapacityPreview={setCapacityPreview} key={fileSession} model={model} patches={history.current} locale={locale} fileName={fileName} visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}} onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}}/>}
         {(issues.length>0||model.mappingWarnings.length>0)&&<div className="pptx-validation" role="status"><strong>{model.mappingWarnings.length?t.mapping:t.validation}</strong><span>{[...model.mappingWarnings,...issues.map(issueText)].slice(0,4).join(' · ')}</span></div>}
       </>}
       {phase===2&&download&&<div className="pptx-export-result"><span className="export-check">✓</span><h3>{t.done}</h3><p>{t.doneHint}</p><small>{exportReport}</small><a className="button button-primary" href={download} onClick={()=>track('workbench_download_clicked')} download={outputName}>{t.download} ↓</a><button className="demo-reset" onClick={()=>setPhase(1)}>{t.back} ↗</button></div>}
       {error&&<div className="pptx-error-message" role="alert">{error}{!model&&<button onClick={openTemplate}>{t.retry}</button>}</div>}
     </div>
-    {mode==='studio'&&<DeckStudio locale={locale} model={model} patches={history.current} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} fileName={fileName}/>}
     <dialog ref={exportDialogRef} className="pptx-export-confirm" aria-labelledby="export-confirm-title" onCancel={event=>{if(exporting)event.preventDefault()}}>
       <h3 id="export-confirm-title">{t.confirmExportTitle}</h3><p>{t.confirmExportHint}</p>
       {exportBlocked&&<p className="pptx-error" role="alert">{model?.mappingWarnings.length?t.mapping:t.validation}</p>}

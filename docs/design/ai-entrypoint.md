@@ -2,6 +2,12 @@
 
 2026-11-07。定位是**忠于原版的快速复用**：保留原 PPT 的对象、几何、样式和资源，只在明确合同内替换内容。不是根据品牌风格重新设计页面。所有范围仍以明确支持的对象与经过验证的合同为准，不承诺任意 PPT 或全内容视觉一致。
 
+## Skill 先打标，Studio 后验收
+
+用户的主要入口是 SlideLatch Skill。AI 在当前已授权会话中完成准备、语义判断与打标，随后把真实 `marked.pptx` 加载到 Studio，再交给用户验收。Studio 保留画布、属性、问题与标记稿/验收包导出。用户确认后，由同一个 SlideLatch Skill 驱动 AI 编译当前已验收稿，再通过仓库内 PPT-DSL 选页、填充、校验和生成。成稿替换、内容 JSON 和创建操作均由 AI 处理，不进入用户工作台。
+
+用户确认与 SVG 边界记录、原生 PowerPoint 证据、正式 release 门禁分别处理，不能相互冒充。
+
 ## 两种 AI 使用方式
 
 ### 已授权的 AI 对话 / 仓库 Skill
@@ -12,16 +18,16 @@
 npm run ai:prepare -- --template /absolute/path/input.pptx --out /absolute/path/new-handoff
 ```
 
-该离线命令绑定原 PPTX 字节和快照，输出请求、Schema、提示词与原稿副本。它只读取 OOXML，未渲染页面，也不假造映射成功或视觉通过记录。任意讲者备注不进入此命令，只传入已有的结构化页面合同。工作台导出的请求则以其当前渲染工作区为准。
+该离线命令绑定原 PPTX 字节和快照，输出请求、Schema、提示词与原稿副本。它只读取 OOXML，未渲染页面，也不假造映射成功或视觉通过记录。任意讲者备注不进入此命令，只传入已有的结构化页面合同。Skill 通过 Studio 操作接口读取的数据则以当前渲染工作区为准。
 
-模型读取 `recognition-request.json` / `prompt.txt` 后，返回含 `marks` 和/或 `pages` 的提案。用户确认后：
+AI 读取 `recognition-request.json` / `prompt.txt` 后，生成含 `marks` 和/或 `pages` 的提案并执行本地校验与应用：
 
 ```sh
 npm run ai:apply -- --bundle /absolute/path/new-handoff \
   --proposal /absolute/path/proposal.json --out /absolute/path/new-marked
 ```
 
-只允许写名称标记和专用页面合同，不能通过提案偷偷改正文、几何或任意备注。输出是 `needs_review` 的 `marked.pptx`，须加载到工作台实测边界，再经过正式 release 门禁。输出目录必须是新目录，防止覆盖已有资料。
+只允许写名称标记和专用页面合同，不能通过提案偷偷改正文、几何或任意备注。输出是 `needs_review` 的 `marked.pptx`，由 AI 加载到 Studio 并完成可执行的边界检查，再交用户验收。确认后如需正式发布，仍经过 release 门禁。输出目录必须是新目录，防止覆盖已有资料。
 
 ### 用户主动启动已有 Codex CLI
 
@@ -62,8 +68,12 @@ npm run ai:codex -- --bundle /absolute/path/new-handoff \
 
 本机临时输出 `/tmp/slidelatch-ai-growth-20261107/generated.pptx` 是测试产物，不是经过目视签核的正式交付模板。
 
-## 浏览器复用
+## 统一 Skill 与 Studio 的分工
 
-工作台的 Deck studio 将模板页选择、填写、完整输入校验和 PPTX 下载接起来。沿用原始 OOXML，不画新的品牌设计。浏览器仅开放明确支持的纯文本/序号与原数量列表；复杂资产、富文本或数据替换使用完整 CLI，不能悄悄降级为外观相近的页面。
+`.agents/skills/slidelatch-workflow/SKILL.md` 是唯一产品 Skill 入口。其本地 references 内聚 PPT-DSL 的对象合同、大纲容量、模板选择、两阶段内容校验、资产绑定、精确修复、生成与检查流程，不要求另行安装或调用 PPT-DSL Skill。确定性运行时沿用 `packages/ppt-dsl`，没有复制另一套代码或新增模型服务。
 
-具体支持边界、当前编译源/正式 release 区别与最终验证记录见 `ai-template-workflow.md`。SVG 近似预览与结构检查均不能取代原生 PowerPoint 验收。
+Studio 仅供已标记稿验收与微调。`WorkflowController` 不渲染 AI 窗口，持续提供 `window.slidelatchWorkflow` 的检查、提案应用、实测与审查包导出能力。`exportReviewBundle()` 对实际写回文件计算 SHA 后打包。AI 必须编译用户最后确认的精确文件，不能继续使用用户编辑前的副本。
+
+AI 在用户确认后调用 `template:release` 或明确标为草稿的 `template:compile`，再执行 `template:select`、`deck:validate --content-only`、完整 `deck:validate`、`deck:generate` 和 `deck:verify`。标记验收与内容大纲确认分别处理；已有获批大纲直接沿用。Studio 不提供成稿页选择、替换、JSON 填写或创建按钮。
+
+具体支持边界、草稿与正式 release 区别见 `ai-template-workflow.md`。程序检查不代替 SVG 观察或原生 PowerPoint 验收；旧独立 PPT-DSL Skill 的程序验证默认值不覆盖本仓库门禁。

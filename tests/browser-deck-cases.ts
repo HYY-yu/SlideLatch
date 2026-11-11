@@ -6,6 +6,7 @@ import path from 'node:path';
 import JSZip from 'jszip';
 import {DOMParser, XMLSerializer} from '@xmldom/xmldom';
 import {loadBrowserTemplate, createBrowserSlideInput, createBrowserDeckInput, selectBrowserCandidates, validateBrowserDeck, generateBrowserDeck} from '../lib/workflow/browser-deck.ts';
+import {locateDeckIssue} from '../lib/workflow/deck-issue-location.ts';
 import {assertBrowserPackageBudget} from '../lib/workflow/browser-package-budget.ts';
 import {inspectWorkspace,applyMarkProposal,sha256Bytes} from '../lib/workflow/session.ts';
 import {verifyDeckPackage} from '../packages/ppt-dsl/src/pptx/verify.ts';
@@ -267,4 +268,29 @@ test('browser output gate rejects errors found only by the shared CLI verifier',
  const loaded=await loadBrowserTemplate(await zip.generateAsync({type:'uint8array'})),input=createBrowserDeckInput(loaded);
  assert.deepEqual(await validateBrowserDeck(loaded,input),[]);
  await assert.rejects(generateBrowserDeck(loaded,input),/BROWSER_OUTPUT_VERIFICATION:.*invalid animation targets/);
+});
+
+
+test('Studio issue location selects the failing repeated slide rather than a valid current instance',async()=>{
+ const input=structuredClone(baseline);
+ input.slides[4].nodes!.text_1='A';
+ const issues=await validateBrowserDeck(template,input);
+ const issue=issues.find(issue=>issue.startsWith('slide_005.nodes.text_1 '))!;
+ assert.ok(issue);
+ const contract=template.slides.find(slide=>slide.templateId==='slide_005')!;
+ const component=contract.nodes.find(node=>node.key==='text_1')!;
+ assert.deepEqual(await locateDeckIssue(template,input,issue,2),{slideIndex:4,key:`${contract.slidePath}#${component.locator.shapeId}`});
+ assert.equal(input.slides[2].nodes!.text_1,baseline.slides[2].nodes!.text_1);
+ assert.equal(await locateDeckIssue(template,baseline,issue,2),null);
+});
+
+test('Studio issue location resolves a repeated list instance and its item object',async()=>{
+ const input=structuredClone(baseline);
+ input.slides[5].lists!.list_1[1].text_1='A';
+ const issues=await validateBrowserDeck(template,input);
+ const issue=issues.find(issue=>issue.startsWith('slide_007.list_1[1].text_1 '))!;
+ assert.ok(issue);
+ const contract=template.slides.find(slide=>slide.templateId==='slide_007')!;
+ const component=contract.lists.find(list=>list.key==='list_1')!.items[1].components.find(node=>node.key==='text_1')!;
+ assert.deepEqual(await locateDeckIssue(template,input,issue,3),{slideIndex:5,key:`${contract.slidePath}#${component.locator.shapeId}`});
 });

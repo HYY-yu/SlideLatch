@@ -27,14 +27,38 @@ const leaf = () => null;
 const link = ({ children, href, ...props }) => React.createElement('a', { ...props, href }, children);
 const i18n = load('lib/i18n.ts');
 const editor = load('lib/pptx/copy.ts');
+const studioShell = load('components/studio/studio-shell.tsx', {
+  'next/link': link, '../pptx/svg-slide': leaf, './studio-shell.module.css': {__esModule:true,default:new Proxy({}, {get:(_,name)=>String(name)})},
+}).default;
+for (const locale of i18n.locales) test(`${locale}: loaded Studio keeps one canvas and exposes source slides without marketing steps`,()=>{
+  const model={slides:Array.from({length:33},(_,index)=>({path:`ppt/slides/slide${index+1}.xml`,nodes:[]})),deck:{size:{width:960,height:540}}};
+  const html=renderToStaticMarkup(React.createElement(studioShell,{
+    locale,model,fileName:'minimal-business-original.pptx',loading:false,busy:false,error:'',page:0,
+    committedPatches:{},textPreviews:{},
+    properties:null,input:React.createElement('input',{type:'file'}),canvas:React.createElement('svg',{'aria-label':'Source canvas'}),actions:null,issues:[],download:null,
+  }));
+  assert.equal((html.match(/<svg/g)||[]).length,1);
+  assert.equal((html.match(/aria-current="page"/g)||[]).length,1);
+  assert.equal((html.match(locale==='zh'?/aria-label="页 [0-9]+"/g:/aria-label="Slide [0-9]+"/g)||[]).length,33);
+  assert.match(html,locale==='zh'?/生成标记 PPTX/:/Generate marked PPTX/);
+  assert.match(html,/minimal-business-original.pptx/);
+  assert.match(html,locale==='zh'?/33 页源模板/:/33 source slides/);
+  assert.doesNotMatch(html,/demo-stepper|三步体验|Explore the product in three steps|页面清单优先|AI 协作|AI handoff|导出 AI 请求|Import proposal|workflow-proposal/);
+  assert.doesNotMatch(html,/创建成稿|重建成稿|成稿编辑|替换版式|内容 JSON|编译并打包|Create deck|Rebuild deck|Deck editing|Add \/ replace slide|Content JSON|Compile and package/);
+  assert.match(html,locale==='zh'?/标记验收/:/Review marks/);
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const tabs=Array.from(doc.getElementsByTagName('button')).filter(button=>button.getAttribute('role')==='tab');
+  assert.deepEqual(tabs.map(tab=>tab.textContent),locale==='zh'?['属性','问题']:['Properties','Issues']);
+  assert.equal(tabs[0].getAttribute('aria-selected'),'true');
+});
 const demo = load('components/template-demo.tsx', Object.fromEntries([
   ['@/lib/pptx/copy', editor], ['@/lib/pptx/dsl', load('lib/pptx/dsl.ts')],
   ['@/lib/demo/template.json', JSON.parse(readFileSync(new URL('../lib/demo/template.json', import.meta.url)))],
   ['@/lib/demo/template.en.json', JSON.parse(readFileSync(new URL('../lib/demo/template.en.json', import.meta.url)))],
   ...['@/lib/analytics/browser', '@/lib/pptx/load', '@/lib/pptx/xml', '@/lib/pptx/validation', '@/lib/pptx/geometry', '@/lib/pptx/grouping', '@/lib/pptx/text-preview', '@/lib/pptx/shortcuts', '@/lib/pptx/marking'].map(name => [name, empty]),
-  ['@/lib/pptx/lists', { slideLists: () => [] }],
-  ...['./pptx/svg-slide', './pptx/workflow-panel', './pptx/list-objects', './pptx/list-settings', './pptx/text-length-controls'].map(name => [name, leaf]),
-  ['./pptx/deck-studio', () => React.createElement('section', { id: 'deck-studio' })],
+  ['@/lib/pptx/lists', { slideLists: () => [] }], ['@/lib/workflow/studio-issue', load('lib/workflow/studio-issue.ts')],
+  ...['./pptx/svg-slide', './pptx/workflow-controller', './pptx/list-objects', './pptx/list-settings', './pptx/text-length-controls'].map(name => [name, leaf]),
+  ['./studio/studio-shell', studioShell],
 ])).default;
 
 for (const locale of i18n.locales) {
@@ -46,6 +70,9 @@ for (const locale of i18n.locales) {
     const studio = renderToStaticMarkup(React.createElement(demo, { locale, mode: 'studio' }));
     assert.match(studio, /type="file"/);
     assert.match(studio, /id="deck-studio"/);
+    assert.doesNotMatch(studio, /id="demo-title"|demo-stepper|下一步|Next step/);
+    assert.match(studio, /Slide.*Latch.*Studio/);
+    assert.match(studio, new RegExp(`href="/${locale}"`));
   });
 }
 
