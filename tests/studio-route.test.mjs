@@ -52,6 +52,7 @@ for (const locale of i18n.locales) test(`${locale}: loaded Studio keeps one canv
   assert.equal(tabs[0].getAttribute('aria-selected'),'true');
 });
 const demo = load('components/template-demo.tsx', Object.fromEntries([
+  ['@/lib/dialog', load('lib/dialog.ts')],
   ['@/lib/pptx/copy', editor], ['@/lib/pptx/dsl', load('lib/pptx/dsl.ts')],
   ['@/lib/demo/template.json', JSON.parse(readFileSync(new URL('../lib/demo/template.json', import.meta.url)))],
   ['@/lib/demo/template.en.json', JSON.parse(readFileSync(new URL('../lib/demo/template.en.json', import.meta.url)))],

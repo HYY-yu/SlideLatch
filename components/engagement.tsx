@@ -1,6 +1,7 @@
 'use client';
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import type {Locale} from '@/lib/i18n';
+import { dismissDialogOnBackdrop } from '@/lib/dialog';
 import {track} from '@/lib/analytics/browser';
 import {loadTallySDK,trialFormId,createTallyLifecycle,type TrialSource} from '@/lib/engagement/tally';
 import {createHeartParticles,type HeartParticle} from '@/lib/engagement/heart-particles';
@@ -38,7 +39,7 @@ export function EngagementProvider({locale,children}:{locale:Locale;children:Rea
    });
   }catch(error){fail(error);}
  }
- return <TrialContext.Provider value={{open:openTrial,loading}}>{children}<dialog ref={dialog} className="trial-dialog" aria-labelledby="trial-dialog-title" aria-describedby="trial-dialog-hint" onClick={event=>{if(event.target===event.currentTarget)dialog.current?.close()}}>
+ return <TrialContext.Provider value={{open:openTrial,loading}}>{children}<dialog ref={dialog} className="trial-dialog" aria-labelledby="trial-dialog-title" aria-describedby="trial-dialog-hint" closedby="any" onClick={dismissDialogOnBackdrop}>
   <button className="trial-dialog-close" onClick={()=>dialog.current?.close()} aria-label={t.close}>×</button>
   <span className="trial-dialog-symbol" aria-hidden="true">↗</span><h2 id="trial-dialog-title">{t.loadError}</h2><p id="trial-dialog-hint">{t.loadHint}</p>
   <div className="trial-recovery-actions"><button className="button button-primary" onClick={()=>void openTrial(lastSource.current)}>{t.retry}</button><a href={`https://tally.so/r/${id}`} target="_blank" rel="noopener noreferrer">{t.direct}</a></div>

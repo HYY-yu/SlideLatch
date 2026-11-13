@@ -1,6 +1,7 @@
 'use client';
 import {useRef,useState} from 'react';
 import type {Locale} from '@/lib/i18n';
+import { dismissDialogOnBackdrop } from '@/lib/dialog';
 import showcaseZh from '@/lib/demo/showcase.json';
 import showcaseEn from '@/lib/demo/showcase.en.json';
 import {SupportWidget} from './engagement';
@@ -23,6 +24,6 @@ export default function GeneratedShowcase({locale}:{locale:Locale}){
   <div className="showcase-comparison" aria-live="polite">{['original',current.id].map((id,i)=><figure key={id}><figcaption><span>{i===0?t.original:t.result}</span><small>{i===0?'MINIMAL BUSINESS':t.cases[version]}</small></figcaption><button className="showcase-slide" onClick={()=>enlarge(id)} aria-label={`${t.zoom} · ${i===0?t.original:t.cases[version]} · ${t.features[feature]}`}><img key={`${id}-${category.id}`} src={imagePath(id)} alt={`${i===0?t.original:t.cases[version]} · ${t.features[feature]}`} width="1600" height="900" loading="lazy" decoding="async"/><span aria-hidden="true">↗</span></button></figure>)}</div>
   <div className="showcase-detail"><a className="showcase-download" onClick={()=>track('showcase_download_clicked',{case_id:current.id,feature:category.id})} href={`${assetBase}/${current.id}.pptx`} download={`${current.id}${locale==='en'?'-en':''}.pptx`}>{t.download}<span>{t.slides}</span></a></div>
   <SupportWidget locale={locale}/>
-  <dialog ref={dialog} className="showcase-lightbox" aria-label={t.zoom} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close()}}><button className="showcase-close" onClick={()=>dialog.current?.close()}>{t.close} ×</button>{enlarged&&<img src={imagePath(enlarged)} alt={`${enlarged==='original'?t.original:t.cases[version]} · ${t.features[feature]}`} width="1600" height="900"/>}</dialog>
+  <dialog ref={dialog} className="showcase-lightbox" aria-label={t.zoom} closedby="any" onClick={dismissDialogOnBackdrop}><button className="showcase-close" onClick={()=>dialog.current?.close()}>{t.close} ×</button>{enlarged&&<img src={imagePath(enlarged)} alt={`${enlarged==='original'?t.original:t.cases[version]} · ${t.features[feature]}`} width="1600" height="900"/>}</dialog>
  </section>;
 }
