@@ -9,6 +9,8 @@ a { color: inherit; text-decoration: none; }
 button { font: inherit; cursor: pointer; }
 a, button { -webkit-tap-highlight-color: transparent; }
 a:focus-visible, button:focus-visible { outline: 2px solid #a99aff; outline-offset: 5px; }
+dialog:modal { overscroll-behavior: contain; }
+dialog::backdrop { overflow: hidden; overscroll-behavior: contain; }
 ::selection { background: #6553b9; color: white; }
 .site { overflow: clip; }
 .section-shell, .header-shell, .demo-wrap { width: min(1104px, calc(100% - 64px)); margin-inline: auto; }
@@ -176,7 +178,7 @@ h1.hero-enter { animation-delay: .08s; }
 .demo-canvas-tools > button { padding: 0; display: flex; align-items: center; gap: 7px; background: none; border: 0; color: #b5a9ea; font-size: 10px; }
 .demo-canvas-tools > button:hover { color: #e1d8ff; }
 .demo-canvas-tools > button span { color: inherit; }
-.template-overview { width: min(1280px, calc(100% - 48px)); max-width: none; max-height: calc(100dvh - 48px); margin: auto; padding: 0; border: 1px solid #ffffff21; border-radius: 12px; background: #131722; color: #e5e7f0; box-shadow: 0 30px 100px #0009; overflow: auto; overscroll-behavior: contain; }
+.template-overview { width: min(1280px, calc(100% - 48px)); max-width: none; max-height: calc(100dvh - 48px); margin: auto; padding: 0; border: 1px solid #ffffff21; border-radius: 12px; background: #131722; color: #e5e7f0; box-shadow: 0 30px 100px #0009; overflow: auto; }
 .template-overview::backdrop { background: #050810d9; backdrop-filter: blur(7px); }
 .overview-header { position: sticky; top: 0; z-index: 1; padding: 17px 20px; display: flex; align-items: center; justify-content: space-between; gap: 18px; background: #131722; border-bottom: 1px solid #ffffff0b; }
 .overview-header h3 { margin: 0; font-size: 14px; font-weight: 600; }
