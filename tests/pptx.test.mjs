@@ -290,3 +290,12 @@ test('editing an existing native group releases members in place and preserves u
  for(const name of Object.keys(beforeZip.files))if(!beforeZip.files[name].dir&&name!==slides[2].path)assert.deepEqual(await afterZip.file(name).async('uint8array'),await beforeZip.file(name).async('uint8array'));
  assert.throws(()=>editListMembers(model,2,list,1,[],{}),/GROUP_EMPTY/);
 });
+
+test('automatic PPTX table rows share the available frame height', async () => {
+ const { tableRowHeights } = await import('../lib/pptx/render-geometry.ts');
+ assert.deepEqual(tableRowHeights([45, 0, 0, 0], 4, 117), [45, 24, 24, 24]);
+ assert.deepEqual(tableRowHeights([0, 0, 0], 3, 86.25), [28.75, 28.75, 28.75]);
+ assert.deepEqual(tableRowHeights([20, 40], 2, 30), [10, 20]);
+ assert.deepEqual(tableRowHeights([60, 0], 2, 40), [20, 20]);
+ assert.deepEqual(tableRowHeights([], 2, 40), [20, 20]);
+});

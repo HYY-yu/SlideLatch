@@ -13,3 +13,23 @@ export function presetPath(geometry: SourceNode['geometry'], width: number, heig
   const inset = Math.max(0, Math.min(width / 2, Math.min(width, height) * adjustment / 100000));
   return `M ${inset} 0 L ${width - inset} 0 L ${width} ${height} L 0 ${height} Z`;
 }
+
+export function tableRowHeights(source: readonly number[], rowCount: number, frameHeight: number): number[] {
+  if (!rowCount) return [];
+
+  const rows = Array.from({ length: rowCount }, (_, i) => {
+    const value = source[i];
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  });
+  const fixedTotal = rows.reduce((sum, value) => sum + value, 0);
+  const automaticCount = rows.filter(value => value === 0).length;
+  if (!fixedTotal) return rows.map(() => frameHeight / rowCount);
+
+  // Zero-height DrawingML rows are automatic. Leave them room even if explicit rows fill the frame.
+  const remaining = frameHeight - fixedTotal;
+  const automaticHeight = automaticCount
+    ? remaining > 0 ? remaining / automaticCount : frameHeight / rowCount
+    : 0;
+  const fixedScale = (frameHeight - automaticHeight * automaticCount) / fixedTotal;
+  return rows.map(value => value ? value * fixedScale : automaticHeight);
+}

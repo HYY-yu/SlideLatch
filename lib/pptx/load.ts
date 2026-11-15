@@ -16,7 +16,7 @@ export async function loadTemplate(bytes:ArrayBuffer):Promise<LoadedTemplate> {
     expanded+=size;
     if(expanded>200*1024*1024)throw new Error('PPTX_EXPANSION_LIMIT');
   }
-  const sourceSlides=await readSourceSlides(bytes);
+  const sourceSlides=await readSourceSlides(bytes,{textOutlines:true});
   if(!sourceSlides.length||sourceSlides.length>200)throw new Error('PPTX_SLIDE_LIMIT');
   console.info('[SlideLatch] template.parse.start',{bytes:bytes.byteLength});
   try {
@@ -25,10 +25,17 @@ export async function loadTemplate(bytes:ArrayBuffer):Promise<LoadedTemplate> {
     if(deck.slides.length!==slides.length)throw new Error('SLIDE_COUNT_MISMATCH');
     const warnings:string[]=[];
     deck.slides.forEach((slide,i)=>{
-      const mapped=new Set<string>();
-      const walk=(elements:RenderElement[])=>elements.forEach(el=>{if(el.id)mapped.add(String(el.id));if(el.elements)walk(el.elements)});
+      const rendered=new Map<string, RenderElement>();
+      const walk=(elements:RenderElement[])=>elements.forEach(el=>{if(el.id)rendered.set(String(el.id),el);if(el.elements)walk(el.elements)});
       walk(slide.elements);
-      for(const node of slides[i].nodes)if(node.marked&&!mapped.has(node.id))warnings.push(`${slides[i].path}#${node.id}`);
+      for(const node of slides[i].nodes){
+        const element=rendered.get(node.id);
+        if(node.marked&&!element)warnings.push(`${slides[i].path}#${node.id}`);
+        if(node.textOutlines){
+          if(element)element.textOutlines=node.textOutlines;
+          delete node.textOutlines;
+        }
+      }
     });
     if(warnings.length)console.warn('[SlideLatch] template.mapping.missing',{targets:warnings});
     const digest=await crypto.subtle.digest('SHA-256',bytes);
