@@ -6,12 +6,32 @@ export function gradientOffset(value: string | number): number {
   return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0;
 }
 
-/** DrawingML trapezoid guides use the shorter side, with adjustment capped by width. */
 export function presetPath(geometry: SourceNode['geometry'], width: number, height: number): string | null {
-  if (geometry?.preset !== 'trapezoid') return null;
-  const adjustment = geometry.adjustments.adj ?? 25000;
-  const inset = Math.max(0, Math.min(width / 2, Math.min(width, height) * adjustment / 100000));
-  return `M ${inset} 0 L ${width - inset} 0 L ${width} ${height} L 0 ${height} Z`;
+  if (!geometry) return null;
+  const { preset, adjustments } = geometry;
+  const shortSide = Math.min(width, height);
+
+  if (preset === 'trapezoid') {
+    const adjustment = adjustments.adj ?? 25000;
+    const inset = Math.max(0, Math.min(width / 2, shortSide * adjustment / 100000));
+    return `M ${inset} 0 L ${width - inset} 0 L ${width} ${height} L 0 ${height} Z`;
+  }
+  if (preset !== 'roundRect' && preset !== 'round2SameRect') return null;
+
+  // DrawingML uses the shorter side for both components of the circular radius.
+  const radius = (adjustment: number) => shortSide * Math.max(0, Math.min(50000, adjustment)) / 100000;
+  const top = radius((preset === 'roundRect' ? adjustments.adj : adjustments.adj1) ?? 16667);
+  const bottom = preset === 'roundRect' ? top : radius(adjustments.adj2 ?? 0);
+
+  const path = [`M ${top} 0 L ${width - top} 0`];
+  if (top) path.push(`A ${top} ${top} 0 0 1 ${width} ${top}`);
+  path.push(`L ${width} ${height - bottom}`);
+  if (bottom) path.push(`A ${bottom} ${bottom} 0 0 1 ${width - bottom} ${height}`);
+  path.push(`L ${bottom} ${height}`);
+  if (bottom) path.push(`A ${bottom} ${bottom} 0 0 1 0 ${height - bottom}`);
+  path.push(`L 0 ${top}`);
+  if (top) path.push(`A ${top} ${top} 0 0 1 ${top} 0`);
+  return path.join(' ') + ' Z';
 }
 
 export function tableRowHeights(source: readonly number[], rowCount: number, frameHeight: number): number[] {

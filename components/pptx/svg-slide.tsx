@@ -98,10 +98,11 @@ export default function SvgSlide({model,slideIndex,patches,selected,selectedMemb
       body=<><defs><clipPath id={`${pid}-clip`}>{element.geom==='ellipse'?<ellipse cx={b.width/2} cy={b.height/2} rx={b.width/2} ry={b.height/2}/>:<rect width={b.width} height={b.height}/>}</clipPath></defs><image href={src} x={-left*dw} y={-top*dh} width={dw} height={dh} preserveAspectRatio="none" clipPath={`url(#${pid}-clip)`}/></>;
     }else if(element.type==='shape'||element.type==='text'){
       const stroke=element.borderWidth?element.borderColor||'#000':'none',strokeWidth=element.borderWidth||0;
+      const strokeDasharray=element.borderType==='dashed'?'5 3':element.borderType==='dotted'?'1 2':undefined;
       let geometry:ReactNode;
       const correctedPath=node&&presetPath(node.geometry,b.width,b.height);
-      if(correctedPath)geometry=<path d={correctedPath} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
-      else if(element.path&&pathBox&&pathBox.width>0&&pathBox.height>0)geometry=<svg width={Math.max(.01,b.width)} height={Math.max(.01,b.height)} viewBox={`${pathBox.x} ${pathBox.y} ${pathBox.width} ${pathBox.height}`} preserveAspectRatio="none" overflow="visible"><path d={element.path} fill={paint} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={element.borderType==='dashed'?'5 3':element.borderType==='dotted'?'1 2':undefined}/></svg>;
+      if(correctedPath)geometry=<path d={correctedPath} fill={paint} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray}/>;
+      else if(element.path&&pathBox&&pathBox.width>0&&pathBox.height>0)geometry=<svg width={Math.max(.01,b.width)} height={Math.max(.01,b.height)} viewBox={`${pathBox.x} ${pathBox.y} ${pathBox.width} ${pathBox.height}`} preserveAspectRatio="none" overflow="visible"><path d={element.path} fill={paint} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray}/></svg>;
       else if(element.shapType==='ellipse')geometry=<ellipse cx={b.width/2} cy={b.height/2} rx={b.width/2} ry={b.height/2} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
       else if(element.shapType==='line'||b.height===0)geometry=<path d={`M0 0L${b.width} ${b.height}`} fill="none" stroke={stroke} strokeWidth={strokeWidth}/>;
       else geometry=<rect width={b.width} height={b.height} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
