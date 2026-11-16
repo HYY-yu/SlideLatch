@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { Locale } from '@/lib/i18n';
-import { dismissDialogOnBackdrop } from '@/lib/dialog';
+import ModalDialog from './modal-dialog';
 import {track,trackOnce} from '@/lib/analytics/browser';
 import templateZh from '@/lib/demo/template.json';
 import templateEn from '@/lib/demo/template.en.json';
@@ -328,12 +328,12 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
       {phase===2&&download&&<div className="pptx-export-result"><span className="export-check">✓</span><h3>{t.done}</h3><p>{t.doneHint}</p><small>{exportReport}</small><a className="button button-primary" href={download} onClick={()=>track('workbench_download_clicked')} download={outputName}>{t.download} ↓</a><button className="demo-reset" onClick={()=>setPhase(1)}>{t.back} ↗</button></div>}
       {error&&<div className="pptx-error-message" role="alert">{error}{!model&&<button onClick={openTemplate}>{t.retry}</button>}</div>}
     </div>
-    <dialog ref={exportDialogRef} className="pptx-export-confirm" aria-labelledby="export-confirm-title" onCancel={event=>{if(exporting)event.preventDefault()}}>
+    <ModalDialog ref={exportDialogRef} className="pptx-export-confirm" aria-labelledby="export-confirm-title" onCancel={event=>{if(exporting)event.preventDefault()}}>
       <h3 id="export-confirm-title">{t.confirmExportTitle}</h3><p>{t.confirmExportHint}</p>
       {exportBlocked&&<p className="pptx-error" role="alert">{model?.mappingWarnings.length?t.mapping:t.validation}</p>}
       {error&&<p className="pptx-error" role="alert">{error}</p>}
       <div><button className="button button-secondary" disabled={exporting} onClick={()=>exportDialogRef.current?.close()}>{t.cancelExport}</button><button className="button button-primary" disabled={exporting||exportBlocked} onClick={()=>exportTemplate(pendingExportPatches)}>{exporting?t.exporting:t.confirmExport}</button></div>
-    </dialog>
-    <dialog ref={overviewRef} className="template-overview" aria-labelledby="overview-title" closedby="any" onClick={dismissDialogOnBackdrop}><div className="overview-content"><div className="overview-header"><h3 id="overview-title">{t.overview}</h3><div><button onClick={()=>overviewRef.current?.close()} aria-label={t.close}>×</button></div></div><div className="overview-image">{model?model.slides.map((slide,index)=><div key={slide.path}><p>{index+1} / {model.slides.length}</p><SvgSlide model={model} slideIndex={index} patches={history.current} locale={locale}/></div>):<img src={template.overview} alt={t.overview} width={3840} height={2160}/>}</div></div></dialog>
+    </ModalDialog>
+    <ModalDialog ref={overviewRef} className="template-overview" aria-labelledby="overview-title" dismissOnBackdrop><div className="overview-content"><div className="overview-header"><h3 id="overview-title">{t.overview}</h3><div><button onClick={()=>overviewRef.current?.close()} aria-label={t.close}>×</button></div></div><div className="overview-image">{model?model.slides.map((slide,index)=><div key={slide.path}><p>{index+1} / {model.slides.length}</p><SvgSlide model={model} slideIndex={index} patches={history.current} locale={locale}/></div>):<img src={template.overview} alt={t.overview} width={3840} height={2160}/>}</div></div></ModalDialog>
   </section>;
 }
