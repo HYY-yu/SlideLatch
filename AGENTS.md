@@ -23,3 +23,10 @@
 - 原稿 SHA、工作区 snapshot、提案与审查记录保持绑定。更改标记或合同后，旧边界观察失效。不得伪造观察记录解锁 release。
 - 无模型的规则识别不得称为 AI 语义理解。新增模型调用、付费服务、软件或大依赖须符合用户授权。
 - PPT 产品操作适用时可读 .agents/skills/slidelatch-workflow/SKILL.md，它不是开发循环的前提；开发测试不自动运行 ai:codex，不接入常驻模型。
+
+## 回归检查
+
+| 规则 | 执行机制 |
+| --- | --- |
+| 应用中的原生弹窗通过 `components/modal-dialog.tsx` 渲染。仅在允许点击遮罩关闭的弹窗上设置 `dismissOnBackdrop`。 | `tests/modal-dialog-boundary.test.mjs` 定位绕过组件的 JSX，`tests/dialog.test.mjs` 验证遮罩兼容行为。两项均由 `npm run verify` 执行。 |
+| Studio 审查和调整已标记的 PPTX。AI 语义标记和成稿生成由 SlideLatch Skill 处理。 | `StudioShell` 的类型限定审查界面输入，`tests/studio-route.test.mjs` 检查中英文界面的审查操作。产品范围由人工验收。 |

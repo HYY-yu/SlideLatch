@@ -52,7 +52,7 @@ for (const locale of i18n.locales) test(`${locale}: loaded Studio keeps one canv
   assert.equal(tabs[0].getAttribute('aria-selected'),'true');
 });
 const demo = load('components/template-demo.tsx', Object.fromEntries([
-  ['@/lib/dialog', load('lib/dialog.ts')],
+  ['./modal-dialog', load('components/modal-dialog.tsx', { '@/lib/dialog': load('lib/dialog.ts') }).default],
   ['@/lib/pptx/copy', editor], ['@/lib/pptx/dsl', load('lib/pptx/dsl.ts')],
   ['@/lib/demo/template.json', JSON.parse(readFileSync(new URL('../lib/demo/template.json', import.meta.url)))],
   ['@/lib/demo/template.en.json', JSON.parse(readFileSync(new URL('../lib/demo/template.en.json', import.meta.url)))],
@@ -68,6 +68,12 @@ for (const locale of i18n.locales) {
     assert.match(html, /id="demo-title"/);
     assert.match(html, new RegExp(editor.editorCopy[locale].choose));
     assert.doesNotMatch(html, /type="file"|id="deck-studio"/);
+    const doc = new DOMParser().parseFromString(`<html><body>${html}</body></html>`, 'text/html');
+    const dialogs = Array.from(doc.getElementsByTagName('dialog'));
+    const overview = dialogs.find(dialog => dialog.getAttribute('class') === 'template-overview');
+    const exportConfirm = dialogs.find(dialog => dialog.getAttribute('class') === 'pptx-export-confirm');
+    assert.equal(overview?.getAttribute('closedby'), 'any');
+    assert.equal(exportConfirm?.hasAttribute('closedby'), false);
     const studio = renderToStaticMarkup(React.createElement(demo, { locale, mode: 'studio' }));
     assert.match(studio, /type="file"/);
     assert.match(studio, /id="deck-studio"/);
