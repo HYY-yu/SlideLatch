@@ -7,4 +7,4 @@ export { bindDeterministicNumbers } from "./deck-numbers.js";
 export { verifyDeckPackage } from "./pptx/verify.js";
 export { readPptx } from "./pptx/read.js";
 export * from "./types.js";
-export { assertReviewMatchesManifest } from "./review-contract.js";
+export type { AnalyzeTemplateOptions } from "./pptx/analyze.js";

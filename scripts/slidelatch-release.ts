@@ -2,7 +2,9 @@ import { readFile, writeFile, mkdir, mkdtemp, copyFile, readdir, rmdir, rm, stat
 import path from 'node:path';
 import { constants } from 'node:fs';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
-import { compileTemplate, assertReviewMatchesManifest } from '../packages/ppt-dsl/src/index.js';
+import { compileTemplate } from '../packages/ppt-dsl/src/compile.js';
+import { SLIDELATCH_ANALYSIS_OPTIONS } from '../lib/workflow/page-contract.ts';
+import { assertReviewMatchesManifest } from '../lib/workflow/review-compiler-contract.ts';
 import { validateReleaseReview } from '../lib/workflow/release.ts';
 // DOM adapters are local to this Node command; browser code uses native DOM APIs.
 Object.assign(globalThis,{DOMParser,XMLSerializer});
@@ -17,7 +19,7 @@ let reserved=false;const published:string[]=[];
 try{
   // Pin the checked bytes so later source-file edits cannot race the compiler.
   const pinned=path.join(temporary,'reviewed.pptx');await writeFile(pinned,bytes);
-  const manifest=await compileTemplate(pinned,temporary);
+  const manifest=await compileTemplate(pinned,temporary,SLIDELATCH_ANALYSIS_OPTIONS);
   assertReviewMatchesManifest(manifest,report.probes);
   manifest.sourceTemplate='template.pptx';
   await writeFile(path.join(temporary,'template-manifest.json'),JSON.stringify(manifest,null,2)+'\n');
