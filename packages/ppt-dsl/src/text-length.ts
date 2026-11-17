@@ -22,4 +22,3 @@ export function meaningfulTextLength(text: string): { length: number; hasInvalid
   }
   return { length, hasInvalidCharacters };
 }
-

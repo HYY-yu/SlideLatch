@@ -11,7 +11,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "dsl:check": "npm --prefix packages/ppt-dsl run check",
     "dsl:test": "npm --prefix packages/ppt-dsl test",
-    "template:compile": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/compile-template.ts",
+    "template:compile": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/compile-template.ts --notes-shape-name slidelatch-page-contract --max-same-kind-components 8",
     "template:select": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/select-template.ts",
     "template:release": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs scripts/slidelatch-release.ts",
     "deck:validate": "node --import ./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs packages/ppt-dsl/src/validate-input.ts",

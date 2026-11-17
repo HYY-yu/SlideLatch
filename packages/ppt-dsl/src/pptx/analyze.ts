@@ -7,7 +7,16 @@ import { maybeReadZipText, readZipText } from "./zip.js";
 import { parsePresentationSlideRelIds, parseRelationships, relationshipPartForOwner, resolveRelationshipTarget } from "./relationships.js";
 import { flattenNodes, parseSlideNodes, type XmlNode } from "./nodes.js";
 
-export async function analyzeTemplate(zip: JSZip, sourceTemplate: string): Promise<TemplateManifest> {
+export interface AnalyzeTemplateOptions {
+  notesShapeName?: string;
+  maxSameKindComponents?: number;
+}
+
+export async function analyzeTemplate(
+  zip: JSZip,
+  sourceTemplate: string,
+  options: AnalyzeTemplateOptions = {},
+): Promise<TemplateManifest> {
   const presentationXml = await readZipText(zip, "ppt/presentation.xml");
   const presentationRels = parseRelationships(await readZipText(zip, "ppt/_rels/presentation.xml.rels"));
   const relById = new Map(presentationRels.map((rel) => [rel.id, rel]));
@@ -18,18 +27,19 @@ export async function analyzeTemplate(zip: JSZip, sourceTemplate: string): Promi
   });
 
   const slides: SlideManifest[] = [];
-  for (const entry of ordered) slides.push(await analyzeSlide(zip, entry));
+  for (const entry of ordered) slides.push(await analyzeSlide(zip, entry, options));
   return { sourceTemplate, generatedAt: new Date().toISOString(), slideCount: slides.length, slides };
 }
 
 async function analyzeSlide(
   zip: JSZip,
   entry: { slideNumber: number; relId: string; slidePath: string },
+  options: AnalyzeTemplateOptions,
 ): Promise<SlideManifest> {
   const slideXml = await readZipText(zip, entry.slidePath);
   const roots = parseSlideNodes(slideXml);
   const allNodes = flattenNodes(roots);
-  const notes = parseNotes(await readNotesText(zip, entry.slidePath));
+  const notes = parseNotes(await readNotesText(zip, entry.slidePath, options.notesShapeName));
   const warnings: string[] = [];
   const slideRels = await readSlideRelationshipTargets(zip, entry.slidePath);
   if (!notes.pageType) warnings.push(`ERROR: 第 ${entry.slideNumber} 页缺少有效页面类型`);
@@ -45,7 +55,7 @@ async function analyzeSlide(
     variableByList.set(parsed.listIndex, bucket);
   }
   for (const [listIndex, groups] of [...variableByList].sort((a, b) => a[0] - b[0])) {
-    lists.push(buildDynamicList(entry.slideNumber, listIndex, groups, slideRels, warnings));
+    lists.push(buildDynamicList(entry.slideNumber, listIndex, groups, slideRels, warnings, options.maxSameKindComponents));
   }
 
   const fixedCandidates = allNodes.filter((node) => {
@@ -64,7 +74,7 @@ async function analyzeSlide(
       const evidence = nodes.map((node) => `shapeId=${node.id || "?"} ${node.name}`).join("; ");
       warnings.push(`ERROR: 第 ${entry.slideNumber} 页列表 ${listIndex} 同时使用 Group DSL 和旧式节点 DSL: ${evidence}`);
     } else {
-      lists.push(buildFixedList(entry.slideNumber, listIndex, nodes, slideRels, warnings));
+      lists.push(buildFixedList(entry.slideNumber, listIndex, nodes, slideRels, warnings, options.maxSameKindComponents));
     }
   }
 
@@ -112,6 +122,7 @@ function buildDynamicList(
   unorderedGroups: XmlNode[],
   rels: Map<string, string>,
   warnings: string[],
+  maxSameKindComponents: number | undefined,
 ): ListManifest {
   const groups = [...unorderedGroups].sort((a, b) => parseGroupName(a.name)!.itemIndex - parseGroupName(b.name)!.itemIndex);
   const firstParsed = parseGroupName(groups[0].name)!;
@@ -122,7 +133,7 @@ function buildDynamicList(
     if (parseGroupName(group.name)?.range) warnings.push(`ERROR: 第 ${slideNumber} 页列表 ${listIndex} 只有第一组可以声明范围`);
   });
   const items = groups.map((group) => buildDynamicItem(group, rels));
-  alignItemsToFirstContract(items, slideNumber, listIndex, warnings);
+  alignItemsToFirstContract(items, slideNumber, listIndex, warnings, maxSameKindComponents);
   inheritAndValidateContract(slideNumber, listIndex, items, warnings);
   const range = firstParsed.range ?? { min: groups.length, max: groups.length, fixed: true };
   const indexes = groups.map((group) => parseGroupName(group.name)!.itemIndex);
@@ -160,6 +171,7 @@ function buildFixedList(
   nodes: XmlNode[],
   rels: Map<string, string>,
   warnings: string[],
+  maxSameKindComponents: number | undefined,
 ): ListManifest {
   const byItem = new Map<number, XmlNode[]>();
   for (const node of nodes) {
@@ -179,7 +191,7 @@ function buildFixedList(
     });
     return { itemIndex, components };
   });
-  alignItemsToFirstContract(items, slideNumber, listIndex, warnings);
+  alignItemsToFirstContract(items, slideNumber, listIndex, warnings, maxSameKindComponents);
   inheritAndValidateContract(slideNumber, listIndex, items, warnings);
   return {
     key: `list_${listIndex}`,
@@ -199,7 +211,13 @@ function buildFixedList(
  * using the declared content range and the node box dimensions, then inherit
  * the first item's stable key/ordinal contract.
  */
-function alignItemsToFirstContract(items: ListItemManifest[], slideNumber: number, listIndex: number, warnings: string[]): void {
+function alignItemsToFirstContract(
+  items: ListItemManifest[],
+  slideNumber: number,
+  listIndex: number,
+  warnings: string[],
+  maxSameKindComponents = Infinity,
+): void {
   const first = items[0]?.components;
   if (!first?.length) return;
   for (const item of items.slice(1)) {
@@ -211,7 +229,7 @@ function alignItemsToFirstContract(items: ListItemManifest[], slideNumber: numbe
         aligned.push(...candidates);
         continue;
       }
-      const { assignment, ambiguous } = bestComponentAssignment(contract, candidates);
+      const { assignment, ambiguous } = bestComponentAssignment(contract, candidates, maxSameKindComponents);
       if (ambiguous) {
         warnings.push(`ERROR: 第 ${slideNumber} 页列表 ${listIndex} 第 ${item.itemIndex} 项的 ${kind} 组件无法唯一匹配第一项；请调整长度范围或节点框尺寸`);
       }
@@ -299,7 +317,7 @@ function isUnderAnyPath(path: number[], ancestors: number[][]): boolean {
   return ancestors.some((ancestor) => path.length > ancestor.length && ancestor.every((value, index) => path[index] === value));
 }
 
-async function readNotesText(zip: JSZip, slidePath: string): Promise<string> {
+async function readNotesText(zip: JSZip, slidePath: string, notesShapeName?: string): Promise<string> {
   const relXml = await maybeReadZipText(zip, relationshipPartForOwner(slidePath));
   if (!relXml) return "";
   const notesRel = parseRelationships(relXml).find((rel) => rel.type.endsWith("/notesSlide"));
@@ -307,9 +325,12 @@ async function readNotesText(zip: JSZip, slidePath: string): Promise<string> {
   const notesPath = resolveRelationshipTarget(slidePath, notesRel.target);
   const xml = await maybeReadZipText(zip, notesPath);
   if (!xml) return "";
-  const dedicated = flattenNodes(parseSlideNodes(xml)).filter(node => node.name === "slidelatch-page-contract");
-  if (dedicated.length > 1) throw new Error("PAGE_CONTRACT_DUPLICATE");
-  const textSource = dedicated[0]?.raw ?? xml;
+  let textSource = xml;
+  if (notesShapeName !== undefined) {
+    const matches = flattenNodes(parseSlideNodes(xml)).filter(node => node.name === notesShapeName);
+    if (matches.length > 1) throw new Error(`PAGE_CONTRACT_DUPLICATE: ${notesShapeName}`);
+    textSource = matches[0]?.raw ?? xml;
+  }
   return [...textSource.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g)].map((match) => decodeXml(match[1])).join("\n");
 }
 

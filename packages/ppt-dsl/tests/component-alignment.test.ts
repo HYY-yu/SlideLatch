@@ -22,3 +22,30 @@ test('fixed groups retain compiler count endpoints even without an explicit rang
  const list=(await analyzeTemplate(fixture(true),'synthetic-test.pptx')).slides[0].lists[0];
  assert.equal(list.dynamic,true);assert.equal(list.minItems,2);assert.equal(list.maxItems,2);
 });
+
+test('compiler preserves the default matching behavior and enforces a caller-supplied limit', async () => {
+  const manifest = await analyzeTemplate(fixture(), 'synthetic-test.pptx');
+  assert.equal(manifest.slides[0].lists[0].items[1].components.length, 2);
+  await assert.rejects(
+    analyzeTemplate(fixture(), 'synthetic-test.pptx', { maxSameKindComponents: 1 }),
+    /COMPONENT_MATCH_LIMIT/,
+  );
+});
+
+test('caller can prefer a named notes object while the default reads all notes', async () => {
+  const zip = fixture();
+  zip.file('ppt/slides/_rels/slide1.xml.rels', '<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/></Relationships>');
+  const notes = (objects: string) => `<p:notes><p:cSld><p:spTree>${objects}</p:spTree></p:cSld></p:notes>`;
+  const named = tx(2, 'named-contract', 127000, '封面');
+  const speaker = tx(3, 'speaker-notes', 127000, '内容');
+  const notesPath = 'ppt/notesSlides/notesSlide1.xml';
+  zip.file(notesPath, notes(named + speaker));
+  const role = async (notesShapeName?: string) =>
+    (await analyzeTemplate(zip, 'synthetic-test.pptx', { notesShapeName })).slides[0].pageType;
+  assert.equal(await role(), '内容页');
+  assert.equal(await role('absent'), '内容页');
+  assert.equal(await role('named-contract'), '封面页');
+
+  zip.file(notesPath, notes(named + speaker + tx(4, 'named-contract', 127000, '目录')));
+  await assert.rejects(role('named-contract'), /PAGE_CONTRACT_DUPLICATE/);
+});

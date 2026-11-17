@@ -30,7 +30,7 @@
 ## 技术基础
 
 - [SlideLatch Skill](.agents/skills/slidelatch-workflow/SKILL.md) 是统一 AI 操作入口，内含标记验收和 PPT-DSL 成稿流程。无需另行安装 PPT-DSL Skill。
-- `packages/ppt-dsl` 提供模板编译、候选页选择、两阶段输入校验、原生 PPTX 生成与包检查，保留上游许可与来源说明。
+- `packages/ppt-dsl` 从 GitHub 固定提交同步，提供模板编译、候选页选择、两阶段输入校验、原生 PPTX 生成与包检查。独立 PPT-DSL Skill 在上游维护。见 [运行时来源与版本](packages/ppt-dsl/PROVENANCE.md)。
 - Studio 以画布为中心，供用户验收和微调已标记稿。成稿替换、内容 JSON 与生成命令由 AI 处理。
 
 流程、支持范围和分层证据见 [AI 入口](docs/design/ai-entrypoint.md) 与 [模板编译和复用](docs/design/ai-template-workflow.md)。原生 PowerPoint 保真仍须按实际文件验收，程序或 SVG 通过不代表原生通过。

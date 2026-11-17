@@ -1,6 +1,11 @@
+import { MAX_MATCH_COMPONENTS } from '../../packages/ppt-dsl/src/component-matching.ts';
 import type { PageContract } from '../pptx/types.ts';
 export const PAGE_TYPES = ['封面页','目录页','章节过渡页','内容页','结尾页'] as const;
 export const PAGE_CONTRACT_SHAPE = 'slidelatch-page-contract';
+export const SLIDELATCH_ANALYSIS_OPTIONS = {
+  notesShapeName: PAGE_CONTRACT_SHAPE,
+  maxSameKindComponents: MAX_MATCH_COMPONENTS,
+};
 export const pagePatchKey = (path:string) => `${path}#@page`;
 export function validatePageContract(value:unknown):PageContract {
   if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('PAGE_CONTRACT_SCHEMA');
