@@ -15,6 +15,12 @@
 - 用户允许通过独立验收的 PR 普通合并，正常 main 合并可以触发部署。每轮核实当前授权、head/base、CI 与未决审查，记录真实 merge SHA 和对应 production 结果。权限、凭据、分支保护、新服务或后台调度仍需相应授权，不能把绿灯当授权。
 - 不为了通过检查删除关键测试、降低门槛或将失败改为跳过。重大合同、数据路径、成本、依赖和保真范围变更须人类决定。
 
+## PPT-DSL 上游维护
+
+- 在规划任务和提交 PR 时明确改动归属。通用 DSL 语法、Manifest 与 Schema、模板编译、选页、填充校验、PPTX 生成与 OOXML 检查归 [ppt-dsl-generator](https://github.com/HYY-yu/ppt-dsl-generator)。
+- 修改公共运行时时，先在上游提交代码和回归测试。上游合并后，再在 SlideLatch 更新 `packages/ppt-dsl` 的源码快照，并记录所用 Git commit SHA。跨仓库改动在 SlideLatch PR 中链接上游 PR 和所用提交。同步以 GitHub 为来源。
+- SlideLatch 负责 Studio、语义打标、专用页面备注、人工验收和发布门禁。两个 Skill 独立维护。
+
 ## 产品与数据边界
 
 - 循环 B 是真实 PPT 的导入、语义标记、边界探索、原生验收、编译与复用。本次先完成循环 A；不启动批量采集或自动处理 PPT。
