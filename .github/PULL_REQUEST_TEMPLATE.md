@@ -17,7 +17,7 @@ Owner / 领域 / 非作者 verifier：
 GitHub verify run、测试提交和该 run 对应的 PR head：
 独立 verifier 身份、验收 SHA、结论、环境与证据：
 OOXML 结构结果：
-真实浏览器结果与截图，或不适用原因：
+真实浏览器的目标视口、操作、结果与截图，或不适用原因：
 原生 PowerPoint 结果与截图，或不适用/阻塞原因：
 有限样本范围与尚未证明的能力：
 
@@ -25,4 +25,4 @@ OOXML 结构结果：
 
 是否需要重大调整决定，关联记录、方案与明确批准：
 新提交后重新验收；旧 head 的绿色检查不可复用。
-本 PR 默认 draft，未授权合并、auto-merge 或生产部署。
+新 PR 默认 draft。普通合并与生产部署按 AGENTS.md 核查当轮授权。启用 auto-merge 需另行授权。

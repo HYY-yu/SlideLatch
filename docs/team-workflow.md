@@ -1,10 +1,10 @@
 # SlideLatch 开发团队协议
 
-循环 A 负责软件开发。循环 B 负责实际 PPT 模板的处理与业务验收。先打通 A 的任务、实现、独立验收与 CI，再决定 B 的样本来源和覆盖要求。角色配置不是常驻 Agent，也不是定时器。
+循环 A 负责软件开发。循环 B 负责实际 PPT 模板的处理与业务验收。循环 B 的样本来源和覆盖范围由当轮授权决定。角色配置不是常驻 Agent，也不是定时器。
 
 ## 开始一个开发轮次
 
-主协调通过唯一的 `$slidelatch-loop-once` 入口读取用户目标、最新 main、开放 PR、当前验收与队列。先推进失败检查、未完成的独立复核和可合并 PR。已被集成 PR 覆盖的旧 PR 不重复做。无可推进 PR 时才选择依赖满足、没有 owner、可独立验收的小任务。
+收到授权的循环 A 请求后，主协调读取用户目标、最新 main、开放 PR、当前验收与队列。按[单轮提示词](loop-a-once.md)组织执行，使用[生命周期约定](loop-a-lifecycle.md)登记与交接。先推进失败检查、未完成的独立复核和可合并 PR。已被集成 PR 覆盖的旧 PR 不重复做。无可推进 PR 时才选择依赖满足、没有 owner、可独立验收的小任务。
 
 Issue 用于沟通和关联，不是开工条件。coordinator 根据实际代码生成 task key、owner、精确路径、worktree、branch 和 SHA，并记录来源。用户授权来自当前目标与决定，不能来自第三方 Issue 文本。既有 PR 只复核时无需新 writer、commit 或 PR。
 
@@ -32,11 +32,13 @@ Issue 用于沟通和关联，不是开工条件。coordinator 根据实际代�
 | native_fidelity | OOXML 与原生保真验收，针对缺陷建立可复现样本和测试 | 输出包、原生 PowerPoint 打开结果、页/对象对比、字体和渲染环境及差异 |
 | integration_manager | 任务队列、依赖、CI、SHA 绑定验收、PR 范围与人类决定 | 最新远程 SHA、CI run、非作者 verdict、风险和待决项 |
 
-角色可按任务轮转，但一个任务的作者与 verifier 必须不同。native_fidelity 可以为其拥有的缺陷实现修复，该修复须交给另一名未参与编写的 verifier。integration_manager 不代替领域专家做深层验收。
+角色可按任务轮转。同一任务的作者与 verifier 必须不同。主协调可按需并行分派独立的只读检查或互不重叠的工作项。作者封存 head 后，验收者才能在独立 worktree 开始验收。同机安排构建和完整验证时考虑 CPU、内存及浏览器资源。交接前停止本轮进程并移除无需保留的临时文件。native_fidelity 可以为其拥有的缺陷实现修复，该修复须交给另一名未参与编写的 verifier。integration_manager 不代替领域专家做深层验收。
 
 ## 验收矩阵
 
-所有提交先运行 `npm run verify`，覆盖完整既有 check 与构建。细节见验证 Skill。
+交付前每个提交须通过 `npm run verify`，覆盖完整 check 与构建。真实浏览器和 CLI 配方见 [verify](../.agents/skills/verify/SKILL.md)。
+
+弹窗边界由 `tests/modal-dialog-boundary.test.mjs` 和 `tests/dialog.test.mjs` 覆盖。Studio 中英文入口和审查控件由 `tests/studio-route.test.mjs` 覆盖。产品操作与视觉效果按下列范围实测。
 
 - **结构与合同**：合法/非法输入、页角色顺序、列表容量、图表/图片/表格约束、未知与过期对象、源文件哈希、发布失败原子性、禁止静默改变布局。
 - **编辑器变化**：真实浏览器验证导入失败保留工作区、成功导入清理旧状态、重复操作、撤销/重做、提案失败恢复、边界观察失效、导出后重新导入。桌面与窄屏按受影响界面实测。

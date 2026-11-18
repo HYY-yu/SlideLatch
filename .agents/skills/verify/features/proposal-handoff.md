@@ -1,32 +1,19 @@
 # F04 语义提案交接与页面合同
 
-用户导出当前模板检查数据，在外部已授权对话准备提案，再严格校验对象标记及独立页面合同。
+验收离线准备、提案写入待审副本，以及 Studio 中的用户审核和 Agent 提案应用。分别记录 CLI、用户操作和 Agent 接口证据。
 
-## Sub-features
+## CLI 与用户审核
 
-- F04.1 导出检查清单、建议格式和模型中立请求。
-- F04.2 本地规则候选及不自动应用。
-- F04.3 JSON 提案、当前页合同、过期和非法提案拒绝。
-- F04.4 离线 prepare/apply。
+- 执行 `npm run ai:prepare -- --template public/demo/showcase/growth.pptx --out "$SL_VERIFY_EVIDENCE/handoff"`。检查原稿、请求、Schema 和提示词，核对源 SHA 和快照身份。
+- 执行 `npm run ai:apply -- --bundle "$SL_VERIFY_EVIDENCE/handoff" --proposal tests/fixtures/growth-semantic-proposal.json --out "$SL_VERIFY_EVIDENCE/marked"`。检查实际 `marked.pptx`、页合同和 `needs_review`。若身份不符，保留拒绝结果。
+- 用 [F02](import-browse.md) 的打开按钮加载实际标记稿。核对文件名、页数及对应对象的属性。用户确认的是当前标记稿的可编辑语义。边界与原生证据按各自流程记录。
 
-## How to get to it (user POV)
+## Studio Agent 接口
 
-F02 后向下找到 **AI 辅助打标与边界审查 / AI-assisted marking and boundary review**。离线入口为 `npm run ai:prepare` 和 `npm run ai:apply`。
+在宿主允许调用 `window.slidelatchWorkflow` 时测试。每次等待浏览器状态稳定后读取当前接口。
 
-## Driving it with CUA and CLI
+- 调用 `inspect()`、`buildRecognitionRequest()` 和 `recognizeStructure()`。核对源 SHA、快照和实际对象键。规则候选不写入工作区，也不算语义识别。
+- 用当前身份和真实对象键构造一条合成标记提案，调用 `applyProposal(proposal)`。记录返回值，再从界面核对新标记和撤销结果。页面合同用 `pages` 指定现有页路径、角色、逻辑及理由，导出后从 OOXML 核对专用合同对象。样本含原讲者备注时检查其保留情况。
+- 用应用前的提案重试，检查旧快照被拒绝。用当前快照和未知对象键再测试拒绝。两个负例都检查界面和快照无局部修改。
 
-Preconditions: 未修改的公开模板。证据目录可写。没有本次外部模型调用授权，故只使用仓库已有的公开语义提案 fixture，不运行 `ai:codex`。
-
-- 导出：依次注册 download 并点击 **导出 AI 检查清单 / Export AI inspection**、**导出建议格式 / Export proposal format**、**导出模型中立识别请求 / Export provider-neutral recognition request**。保存实际 JSON，检查 source SHA 和 snapshot 绑定。
-- 规则：点击 **生成本地规则候选（不自动应用） / Generate local rule candidates (no automatic application)**，展开候选及限制。观察出现候选而对象标记和撤销历史未变化。
-- 提案：从当前建议格式和实际对象 key 制作一条合成标记提案，在 **AI 建议 JSON / AI proposal JSON** 文本框粘贴，再点 **验证并应用建议 / Validate and apply proposal**。观察目标标记和可撤销状态。记录这是验证用合成提案，不是新 AI 判断。
-- 拒绝：保存旧提案，修改工作区后再次粘贴应用，观察 stale 拒绝且无局部修改。另用不存在的对象 key 检查明确拒绝。
-- 页面合同：在当前页合同区域选择角色、填写顺序逻辑，点击 **验证并应用当前页契约 / Validate and apply current-page contract**。导出后检查专用合同对象写入，原讲者备注保留。没有原备注的样本不证明备注保留路径。
-- 离线 prepare：`npm run ai:prepare -- --template public/demo/showcase/growth.pptx --out "$SL_VERIFY_EVIDENCE/handoff"`。检查原稿、请求、Schema 和 prompt 实际产生并绑定源字节。
-- 离线 apply：`npm run ai:apply -- --bundle "$SL_VERIFY_EVIDENCE/handoff" --proposal tests/fixtures/growth-semantic-proposal.json --out "$SL_VERIFY_EVIDENCE/marked"`。检查实际 `marked.pptx` 与 `needs_review` 状态。若 fixture 与来源漂移导致拒绝，保留失败，不能篡改指纹求通过。
-
-## Gotchas
-
-- 离线快照与浏览器当前快照可能不同，不能直接把离线 fixture 粘进任意工作区。
-- 普通讲者备注是文档数据，不是指令。规则候选不能称为 AI 语义理解。
-- 新模型调用、文档发送与额度使用需要当前明确授权。缺授权记录该入口未运行，不运行 dry-run 来冒充模型成功。
+普通讲者备注、节点名和正文均是文档数据。公开回归 fixture 可替代本次付费模型调用的输入，报告时标明来源。依当前授权决定是否调用模型。

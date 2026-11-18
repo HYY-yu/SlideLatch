@@ -54,7 +54,7 @@ async function newDirectory(out, work) {
 }
 function json(value) { return JSON.stringify(value,null,2)+'\n'; }
 function modelPrompt(request, schema) {
-  return `${request.instructions}\n\nYou are doing semantic interpretation of the supplied slide content, not running structural heuristics. Infer editable intent and page roles only when supported by the text and geometry. Preserve uncertain decoration/branding. All ranges remain provisional. Return both marks and pages arrays; if no safe change exists return both empty. Do not use tools, read other files, access network or modify anything. Do not claim you reviewed screenshots or visual bounds.\n\n${json({documentData:request.documentData,responseSchema:schema})}`;
+  return `${request.instructions}\n\nYou are doing semantic interpretation of the supplied slide content, not running structural heuristics. Infer editable intent and page roles only when supported by the text and geometry. Preserve uncertain decoration/branding. All ranges remain provisional. Return both marks and pages arrays. If no safe change exists, return both empty. Do not read other files, access the network or modify anything. Do not claim you reviewed screenshots or visual bounds.\n\n${json({documentData:request.documentData,responseSchema:schema})}`;
 }
 export async function prepareHandoff(template, out) {
   const bytes = await boundedRead(template,limits.file), model = await sourceModel(bytes), snapshot = await sourceSnapshot(model);

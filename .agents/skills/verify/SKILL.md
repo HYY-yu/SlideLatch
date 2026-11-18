@@ -5,7 +5,7 @@ description: 验证 SlideLatch 的真实浏览器工作台和 PPTX CLI 用户流
 
 # Verify SlideLatch
 
-先读 [FeatureMap](features/README.md)，按本次 scope 选择功能和入口。完整审计覆盖每个功能及其入口；生成本 Skill 时只需实证一条路径。未运行路径明确写 `not_run`，前置条件不满足写 `blocked`。
+先读 [FeatureMap](features/README.md)，按本次 scope 选择功能和入口。完整审计覆盖功能地图上的现行入口。未运行路径明确写 `not_run`，前置条件不满足写 `blocked`。
 
 ## Launch
 
@@ -37,7 +37,7 @@ env SLIDELATCH_DIST_DIR=.next-slidelatch-qa NEXT_PUBLIC_POSTHOG_KEY= NEXT_PUBLIC
 
 保存终端 session ID、命令、启动时间和 worktree 路径。不要后台化或在共享 checkout 同时运行构建。沙箱禁止 loopback 监听时，使用宿主正式权限流程，不能换公网地址规避。Next 使用自定义缓存目录会重写 `next-env.d.ts` 的路由类型引用，也可能在 `tsconfig.json` 的 include 中添加缓存路径。启动前保存这两个文件及已有差异，清理时只还原本次自动改动，不提交它们。
 
-出现 `Ready` 后，用 `mcp__cua_repl` 创建专用 Chrome 标签打开 `http://127.0.0.1:43127/zh`。等真实界面出现，且「试用公开示例」已启用，才算可用。英文为 `/en`。使用新的专用标签隔离页面内存及 sessionStorage；不要接管用户已有标签。不同 worktree、缓存目录、端口和标签可并行，单个实例内串行操作。
+出现 `Ready` 后，用 `mcp__cua_repl` 创建专用 Chrome 标签。首页用 `/zh` 或 `/en`。Studio 用 `/zh/deck-studio` 或 `/en/deck-studio`，等待对应语言的公开模板加载。使用新的专用标签隔离页面内存及 sessionStorage；不要接管用户已有标签。不同 worktree、缓存目录、端口和标签可并行，单个实例内串行操作。
 
 ## Doctor
 
@@ -51,22 +51,22 @@ lsof -nP -iTCP:43127 -sTCP:LISTEN
 
 从监听结果读取 PID，再运行 `ps -p PID -o pid=,ppid=,lstart=,command=` 和 `lsof -a -p PID -d cwd`。将 PID 换为刚读到的数字。确认它是本次终端 session 启动的 Next 子进程，cwd 是本次 worktree，代码 SHA 和未提交范围与启动记录相符。父终端仍存活且没有启动错误。沙箱不允许读取进程信息时走宿主只读权限流程，不能省略身份检查。身份不符立即停止操作，不杀进程。
 
-再用浏览器观察 URL、页面标题及 `选择模板，填充成稿 / Build a deck from your template` 标题，确认无构建错误覆盖层。HTTP 200 不能代替这一步。服务正常但页面卡住时，先保存证据，再关闭本次标签并新建标签回到已知状态。
+再按功能核对浏览器 URL 和已加载内容。首页应显示案例区。Studio 应显示模板文件名、标记验收区、页面列表和可用的打开按钮。确认没有构建错误覆盖层。HTTP 200 不能代替这一步。服务正常但页面卡住时，先保存证据，再关闭本次标签并新建标签回到已知状态。
 
 ## Drive
 
 浏览器只用宿主提供的 `mcp__cua_repl`，按其首次返回文档操作。以下是该工具内的实际调用方式；不要把 UI 操作转到 shell、独立 Playwright 或内部状态 setter：
 
 ```javascript
-var slTab = await cua.createBrowserTab('chrome', 'http://127.0.0.1:43127/zh', {sessionName:'🔎 SlideLatch verify'});
+var slTab = await cua.createBrowserTab('chrome', 'http://127.0.0.1:43127/zh/deck-studio', {sessionName:'🔎 SlideLatch verify'});
 await slTab.getAXState();
-await slTab.playwright.getByRole('button', {name:'试用公开示例', exact:true}).click();
+await slTab.playwright.getByRole('button', {name:'页 2', exact:true}).click();
 await slTab.getAXState();
 ```
 
 每次操作后获取新 AX/DOM 状态，再决定下一步。索引会变化，不能复用旧 AX 编号。优先使用地图中的 role、名称和 label；同名控件按区域限定。ARIA pressed 按钮在原生 AX 中可能显示为 checkbox，使用 DOM role locator 或最新 AX，不假设两者角色文本相同。
 
-需要下载时，先注册 `slTab.playwright.waitForEvent('download', {timeoutMs:30000})`，再点链接，然后读取下载的 `path()`。验证实际落盘文件并复制到证据目录。超时先保存状态及 doctor，不能把链接出现当成下载完成。文件选择先读宿主的 `file-uploads` 文档，注册 chooser 后点按钮，再 `setFiles`。仅选择本地图列出的公开样本。
+需要下载时，先注册 `slTab.playwright.waitForEvent('download', {timeoutMs:30000})`，再点链接，然后读取下载的 `path()`。验证实际落盘文件并复制到证据目录。事件超时时先保存状态并复查实例。若浏览器已落盘，可用文件时间、名称和内容确认对应本次操作。记录事件超时，保留实际文件证据。文件选择先读宿主的 `file-uploads` 文档，注册 chooser 后点按钮，再 `setFiles`。仅选择本地图列出的公开样本。
 
 CLI 使用当前 worktree 中的现有 npm scripts。命令、stdout、stderr 和退出码一起保存。读取生成结果并计算 SHA-256。Node 中的 browser-deck 测试是引擎测试，不能代替真实浏览器入口。
 
@@ -76,7 +76,7 @@ CLI 使用当前 worktree 中的现有 npm scripts。命令、stdout、stderr �
 
 - 在操作前后保存完整 AX/DOM 文本和截图；画面包含功能标题或文件身份。落盘 AX 使用 `slTab.getAXState({emit:false,disableDiffing:true})`，或保存 `slTab.playwright.domSnapshot()`。默认 AX 是增量，单独保存可能只有“无变化”，不能作为完整状态证据。通过宿主截图接口获取 bytes，再用 CUA runtime 的文件 API 保存到本次证据目录。记录实际点击或填写动作。
 - 用 `slTab.dev.logs({levels:['warn','error'],limit:100})` 捕获日志；接口不可用时说明缺口。不要隐藏错误。
-- 变更类操作再读取结果，例如保存文件、导出后重导入、撤销后字段值或修改后失效状态。不得调用 `window.slidelatchWorkflow` 或 `window.slidelatchDeck` 写入状态来充当用户路径。
+- 变更类操作再读取结果，例如保存文件、导出后重导入、撤销后字段值或修改后失效状态。用户路径通过实际控件操作。F04 和 F05 的受支持 Studio 接口另记为 Agent 路径。宿主无法调用接口时标 `blocked`，保留已完成的 UI 和 CLI 证据。
 - 生成 PPTX 后运行 `npm run deck:verify -- --pptx 证据目录中的实际文件`。它只证明 OOXML 结构。受影响的原生视觉检查须由 Microsoft PowerPoint 独立完成，记录版本、字体、修复提示和页图，不能用 SVG 或 LibreOffice 替代。
 - 本地不配置 PostHog，不主动打开外部表单。验证 Tally 提交、真实模型调用或其他外部副作用前，按本次用户授权处理；缺授权就记录该入口未验证。没有网络观测时不宣称“零网络请求”。
 
@@ -88,6 +88,6 @@ CLI 使用当前 worktree 中的现有 npm scripts。命令、stdout、stderr �
 
 ## Helpers
 
-本 Skill 不新增驱动程序或依赖。浏览器使用 CUA；CLI 调用根 `package.json` 中的 `template:compile`、`template:select`、`template:release`、`deck:validate`、`deck:generate`、`deck:verify`、`ai:prepare` 和 `ai:apply`。具体参数见各功能文件。
+浏览器使用 CUA。CLI 调用根 `package.json` 中的 `template:compile`、`template:select`、`template:release`、`deck:validate`、`deck:generate`、`deck:verify`、`ai:prepare` 和 `ai:apply`。具体参数见各功能文件。
 
 提交前运行 `npm run verify`。后续使用 `pstack:maintain-verification-skill` 维护地图，按 Codex 适配定位到本目录，不建立后台计划。
