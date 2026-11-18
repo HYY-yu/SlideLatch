@@ -5,20 +5,19 @@
 ## Sub-features
 
 - F02.1 本地导入、取消文件选择、重复导入。
-- F02.2 公开模板载入、页面缩略图、全部页面预览。
+- F02.2 公开模板自动载入、页列表与画布。
 - F02.3 失败保留当前工作区，成功替换清理历史和旧结果。
 
 ## How to get to it (user POV)
 
-`/zh#demo` 或 `/en#demo` 的 **打开本地 PPTX / Open local PPTX**；初始步骤的 **使用极简商务 / Use Minimal Business**。导入后左侧是「PPT 页面列表 / Slide list」。
+`/zh/deck-studio` 或 `/en/deck-studio`。在「工作台操作 / Studio actions」中点击 **打开 / Open** 选择本地 PPTX。公开模板自动加载。导入后左侧显示「PPT 页面列表 / Slide list」。
 
 ## Driving it with CUA
 
 Preconditions: 基线标签。浏览器文件选择能力可用。用公开中文模板及公开 `growth.pptx`；准备只含文本 `not a zip` 的一次性 `.pptx` 负例，保存于证据目录。
 
-- 公开模板：点击 **使用极简商务**，等待页面计数 `1 / 33`、画布及对象列表出现。点击名称为 **页 2 / Slide 2** 的缩略图，观察计数和画布更新。
-- 总览：点击 **查看全部页面 / View all slides**，观察对话框多页预览；点击 **关闭预览 / Close preview**，观察返回当前页。
-- 本地：注册 filechooser，点击 **打开本地 PPTX**，用 `setFiles` 选择 `public/demo/showcase/growth.pptx` 的绝对路径。观察文件名和 `1 / 10`。重新打开同一文件，观察仍可正常导入。
+- 公开模板：等待文件名、页面计数 `1 / 33`、页列表和画布出现。点击 **页 2 / Slide 2**，观察当前页、计数和画布更新。
+- 本地：注册 filechooser，点击 **打开 / Open**，用 `setFiles` 选择 `public/demo/showcase/growth.pptx` 的绝对路径。观察文件名和 `1 / 10`。重新打开同一文件，观察仍可正常导入。
 - 取消：打开选择器后使用宿主提供的取消动作。观察原文件、页码和修改仍保留。无法取消选择器时报告该入口 blocked，不切换到内部导入 API。
 - 失败：先按 F03 修改一次并记录。选择负例文件，观察错误提示以及原文件、修改和历史保留。保存控制台中的预期解析错误。
 - 替换：选择合法中文模板，观察新文件、`1 / 33`、初始选中状态及无旧撤销记录；先前已生成下载和旧审查不可继续有效。

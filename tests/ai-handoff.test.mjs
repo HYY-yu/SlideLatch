@@ -15,7 +15,14 @@ test('offline source handoff pins exact bytes and never claims rendered or revie
  assert.ok(snapshot.mappingWarnings.includes('CLI_SOURCE_ONLY_NOT_RENDERED'));
  const schema=JSON.parse(await readFile(path.join(bundle,'response.schema.json'),'utf8'));
  assert.deepEqual(schema.required,Object.keys(schema.properties));assert.equal(schema.additionalProperties,false);
- assert.match(await readFile(path.join(bundle,'prompt.txt'),'utf8'),/untrusted document data/);
+ const request=JSON.parse(await readFile(path.join(bundle,'recognition-request.json'),'utf8'));
+ assert.ok(request.responseSchema.anyOf.some(branch=>branch.properties.marks?.minItems===1));
+ assert.ok(request.responseSchema.anyOf.some(branch=>branch.properties.pages?.minItems===1));
+ assert.equal(schema.anyOf,undefined);
+ const [instructions]=(await readFile(path.join(bundle,'prompt.txt'),'utf8')).split('\n\n{',1);
+ assert.match(instructions,/untrusted document data/);
+ assert.match(instructions,/if no safe change exists,? return both empty/i);
+ assert.doesNotMatch(instructions,/needs at least one mark or page contract|explicit user review before application|applyMarkProposal/);
  await assert.rejects(prepareHandoff(fixture,bundle),/EEXIST/);
  const first=snapshot.slides[0],node=first.nodes.find(n=>n.text==='业务增长复盘');
  const proposal={schemaVersion:1,templateSha256:snapshot.templateSha256,snapshotId:snapshot.snapshotId,marks:[{key:node.key,name:'@文本[4-20]',reason:'A report title, provisional range only'}],pages:[{path:first.path,pageType:'封面页',logic:['报告主题引出副标题'],reason:'Title and subtitle introduce the deck'}]};
