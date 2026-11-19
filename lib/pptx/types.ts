@@ -1,3 +1,5 @@
+import type { TextOutlineParagraph } from './text-outline';
+
 export type Box = { x: number; y: number; width: number; height: number };
 export type SourceNode = {
   key: string; slidePath: string; id: string; name: string; kind: string;
@@ -5,6 +7,7 @@ export type SourceNode = {
   childBox: Box | null; rotation: number; flipH: boolean; flipV: boolean;
   text: string; marked: boolean;
   geometry?: { preset: string; adjustments: Record<string, number> };
+  textOutlines?: TextOutlineParagraph[];
   hasImage?: boolean; hasTextBody?: boolean; dataKind?: 'table' | 'chart';
 };
 export type PageContract = { pageType: '封面页' | '目录页' | '章节过渡页' | '内容页' | '结尾页'; logic: string[] };
@@ -17,6 +20,7 @@ export type Paint = { type: string; value?: unknown; [key: string]: unknown };
 export type RenderElement = {
   id: string; type: string; left: number; top: number; width: number; height: number;
   rotate?: number; order?: number; name?: string; elements?: RenderElement[];
+  textOutlines?: TextOutlineParagraph[];
   content?: string; fill?: Paint; borderColor?: string; borderWidth?: number;
   borderType?: string; isFlipH?: boolean; isFlipV?: boolean; base64?: string;
   blob?: string; src?: string; ref?: string; geom?: string; shapType?: string;

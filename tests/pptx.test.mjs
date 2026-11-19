@@ -290,3 +290,27 @@ test('editing an existing native group releases members in place and preserves u
  for(const name of Object.keys(beforeZip.files))if(!beforeZip.files[name].dir&&name!==slides[2].path)assert.deepEqual(await afterZip.file(name).async('uint8array'),await beforeZip.file(name).async('uint8array'));
  assert.throws(()=>editListMembers(model,2,list,1,[],{}),/GROUP_EMPTY/);
 });
+
+test('automatic PPTX table rows share the available frame height', async () => {
+ const { tableRowHeights } = await import('../lib/pptx/render-geometry.ts');
+ assert.deepEqual(tableRowHeights([45, 0, 0, 0], 4, 117), [45, 24, 24, 24]);
+ assert.deepEqual(tableRowHeights([0, 0, 0], 3, 86.25), [28.75, 28.75, 28.75]);
+ assert.deepEqual(tableRowHeights([20, 40], 2, 30), [10, 20]);
+ assert.deepEqual(tableRowHeights([60, 0], 2, 40), [20, 20]);
+ assert.deepEqual(tableRowHeights([], 2, 40), [20, 20]);
+});
+
+test('rounded rectangle presets keep circular corners on wide and tall shapes', async () => {
+ const { presetPath } = await import('../lib/pptx/render-geometry.ts');
+ const wide = presetPath({ preset: 'roundRect', adjustments: { adj: 50000 } }, 360, 78);
+ assert.match(wide ?? '', /^M 39 0 L 321 0 A 39 39 /);
+ assert.equal((wide.match(/A 39 39 /g) ?? []).length, 4);
+
+ const tall = presetPath({ preset: 'roundRect', adjustments: { adj: 5000 } }, 200, 360);
+ assert.match(tall ?? '', /^M 10 0 L 190 0 A 10 10 /);
+
+ const header = presetPath({ preset: 'round2SameRect', adjustments: { adj1: 25000 } }, 200, 60);
+ assert.match(header ?? '', /^M 15 0 L 185 0 A 15 15 /);
+ assert.equal((header.match(/A 15 15 /g) ?? []).length, 2);
+ assert.match(header, /L 200 60 L 0 60/);
+});
