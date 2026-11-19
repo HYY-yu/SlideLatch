@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { PAGE_CONTRACT_SHAPE, parsePageContract, pageContractText, validatePageContract } from '../workflow/page-contract.ts';
+import { readTextOutlines } from './text-outline.ts';
 import type { Box, GroupMember, PageContract, Patches, SourceNode, SourceSlide } from './types';
 
 export const NS = {
@@ -44,7 +45,38 @@ function shapeText(shape: Element): string {
   const text = (node: Element): string => node.localName === 't' ? node.textContent || '' : node.localName === 'br' ? '\n' : children(node).map(text).join('');
   return children(body).filter(node => node.localName === 'p').map(text).join('\n');
 }
-export async function readSourceSlides(bytes: ArrayBuffer | Uint8Array): Promise<SourceSlide[]> {
+async function relatedPart(zip: JSZip, part: string, type: string) {
+  const separator = part.lastIndexOf('/') + 1;
+  const path = `${part.slice(0, separator)}_rels/${part.slice(separator)}.rels`;
+  const entry = zip.file(path);
+  if (!entry) return;
+  const relation = descendants(parseXml(await entry.async('string'), path), '*', 'Relationship')
+    .find(node => node.getAttribute('Type') === `${NS.r}/${type}` && node.getAttribute('TargetMode') !== 'External');
+  const target = relation?.getAttribute('Target');
+  return target ? resolvePart(part, target) : undefined;
+}
+
+async function textOutlineScheme(zip: JSZip, path: string, doc: Document) {
+  const read = async (part: string | undefined) => {
+    const entry = part && zip.file(part);
+    return entry && part ? parseXml(await entry.async('string'), part) : undefined;
+  };
+  const layout = await relatedPart(zip, path, 'slideLayout');
+  const master = layout && await relatedPart(zip, layout, 'slideMaster');
+  const theme = (master && await relatedPart(zip, master, 'theme')) ?? await relatedPart(zip, 'ppt/presentation.xml', 'theme');
+  const [layoutDoc, masterDoc, themeDoc] = await Promise.all([read(layout), read(master), read(theme)]);
+  const colorMap = descendants(doc, NS.a, 'overrideClrMapping')[0]
+    ?? (layoutDoc && descendants(layoutDoc, NS.a, 'overrideClrMapping')[0])
+    ?? (masterDoc && descendants(masterDoc, NS.p, 'clrMap')[0]);
+  const palette = themeDoc && descendants(themeDoc, NS.a, 'clrScheme')[0];
+  const defaults: Record<string, string> = { tx1: 'dk1', tx2: 'dk2', bg1: 'lt1', bg2: 'lt2' };
+  return (name: string) => {
+    const entry = palette && child(palette, colorMap?.getAttribute(name) || defaults[name] || name);
+    return entry && (child(entry, 'srgbClr')?.getAttribute('val') ?? child(entry, 'sysClr')?.getAttribute('lastClr') ?? undefined);
+  };
+}
+
+export async function readSourceSlides(bytes: ArrayBuffer | Uint8Array, options?: { textOutlines: boolean }): Promise<SourceSlide[]> {
   const zip = await JSZip.loadAsync(bytes);
   const presentation = zip.file('ppt/presentation.xml'), relations = zip.file('ppt/_rels/presentation.xml.rels');
   if (!presentation || !relations) throw new Error('PPTX_STRUCTURE: missing presentation');
@@ -61,6 +93,16 @@ export async function readSourceSlides(bytes: ArrayBuffer | Uint8Array): Promise
     const doc = parseXml(await part.async('string'), path);
     const tree = descendants(doc, NS.p, 'spTree')[0];
     if (!tree) throw new Error(`PPTX_SLIDE_TREE: ${path}`);
+    const hasThemedOutline = options?.textOutlines && descendants(tree, NS.a, 'rPr').some(run => {
+      const line = child(run, 'ln');
+      return line && descendants(line, NS.a, 'schemeClr').length > 0;
+    });
+    const schemeColor = hasThemedOutline
+      ? await textOutlineScheme(zip, path, doc).catch(error => {
+        console.warn('[SlideLatch] template.text-outline.theme.failed', { path, error });
+        return () => undefined;
+      })
+      : () => undefined;
     const nodes: SourceNode[] = [];
     function visit(parent: Element, parentId: string | null) {
       for (const shape of children(parent).filter(node=>shapeTypes.has(node.localName))) {
@@ -75,6 +117,7 @@ export async function readSourceSlides(bytes: ArrayBuffer | Uint8Array): Promise
           const match = /^val\s+(-?\d+(?:\.\d+)?)$/.exec(guide.getAttribute('fmla') || '');
           if (match) adjustments[guide.getAttribute('name') || ''] = Number(match[1]);
         }
+        const textOutlines = options?.textOutlines ? readTextOutlines(shape, schemeColor) : [];
         const node: SourceNode = {
           key: `${path}#${id}`, slidePath:path, id, name, kind:shape.localName, parentId,
           children:[], box:readBox(xfrm), childBox:shape.localName==='grpSp'?readBox(xfrm,'chOff','chExt'):null,
@@ -82,6 +125,7 @@ export async function readSourceSlides(bytes: ArrayBuffer | Uint8Array): Promise
           flipH:xfrm?.getAttribute('flipH')==='1', flipV:xfrm?.getAttribute('flipV')==='1',
           text:shape.localName==='grpSp'?'':shapeText(shape), marked:name.trim().startsWith('@'),
           geometry:preset?{preset:preset.getAttribute('prst') || '',adjustments}:undefined,
+          ...(textOutlines.length ? { textOutlines } : {}),
           hasImage:shape.localName==='pic'||!!(properties&&child(properties,'blipFill')),
           hasTextBody:!!child(shape,'txBody'),
           dataKind:descendants(shape,NS.a,'graphicData')[0]?.getAttribute('uri')?.endsWith('/table')?'table':descendants(shape,NS.a,'graphicData')[0]?.getAttribute('uri')?.endsWith('/chart')?'chart':undefined,

@@ -1,6 +1,6 @@
 # PR-first host invocation
 
-Invoke `$slidelatch-loop-once` through `.agents/skills/slidelatch-loop-once/SKILL.md`. The coordinator selects an authorized open PR first, or an independent small task from the accepted goals and queue. The user supplies goals and decisions, not this JSON. The coordinator derives and records the exact scope.
+Use this prompt with the [team workflow](team-workflow.md) for an authorized Loop A round. Use `scripts/loop-a-once.mjs` as described below and follow the [lifecycle contract](loop-a-lifecycle.md). The coordinator selects an authorized open PR first, or an independent small task from the accepted goals and queue. The user supplies goals and decisions, not this JSON. The coordinator derives and records the exact scope.
 
 ```json
 {
@@ -54,7 +54,7 @@ For production, use actual merge SHA, provider, deployment ID, URL, environment 
 
 A confirmed merge with stopped actors and exited commands may release locally while deployment is pending. The next coordinator reads that archive and calls `observe-deployment plan.json archive.json remote.json` with fresh production evidence and observer {id, source, observedAt}. It takes no capability and does not acquire, modify or release any lease. It returns OBSERVED, the origin epoch and production outcome. The observer is the current real coordinator. The same long-lived coordinator may continue observing; a different coordinator must not claim the former owner's identity. An unknown merge is not eligible and retains its original lock. Keep the unfinished deployment in the host's task record without resetting the original invocation.
 
-A schedule can invoke the same Skill with this policy. Do not edit scheduler files, register tasks or change permissions as part of a development round. Implementation tests do not prove a real native pilot or deployed schedule. Validate those separately and report their actual state.
+An authorized schedule can use this prompt and the same lifecycle contract. Do not edit scheduler files, register tasks or change permissions as part of a development round. Implementation tests do not prove a real native pilot or deployed schedule. Validate those separately and report their actual state.
 
 ## Invocation start record
 
@@ -68,7 +68,7 @@ Before dispatch and before task-document reading, the caller should provide its 
 }
 ```
 
-Replace `startedAt: 0` with the original Unix-millisecond dispatch timestamp attested by the caller's runtime. Do not use the time of a later retry or infer it from a previous report. If that timestamp is unavailable, omit `startedAt` from start.json. Then copy the helper's returned `startedAt` unchanged into input.json and preserve its `timingSource: first-observable-entry`. This fallback covers time from the first observable entry, not earlier skill reading. The invocation record is not a capability and contains no actor token; capability files remain opaque.
+Replace `startedAt: 0` with the original Unix-millisecond dispatch timestamp attested by the caller's runtime. Do not use the time of a later retry or infer it from a previous report. If that timestamp is unavailable, omit `startedAt` from start.json. Then copy the helper's returned `startedAt` unchanged into input.json and preserve its `timingSource: first-observable-entry`. This fallback covers time from the first observable entry, not earlier document reading. The invocation record is not a capability and contains no actor token; capability files remain opaque.
 
 The helper reserves and syncs a record keyed by invocationId in the repository common directory before writing the exclusive external output file. The same invocationId cannot obtain a later start through a different output path; a retry without a timestamp reuses the original start. Prepare and acquire compare the supplied record with this repository registry. The output file must remain outside repositories. Both commands require invocationRecord, invocationId and exactly the recorded startedAt. Reusing the output file fails rather than resetting the budget. These records rely on the cooperative host, not tamper-proof storage. Never extend an existing lease budget.
 

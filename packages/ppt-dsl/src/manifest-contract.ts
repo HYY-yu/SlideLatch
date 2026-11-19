@@ -35,4 +35,3 @@ function assertComponentLocator(slide: string, component: string, locator: { sha
     throw new Error(`${slide}.${component} 缺少编译后的 locator`);
   }
 }
-

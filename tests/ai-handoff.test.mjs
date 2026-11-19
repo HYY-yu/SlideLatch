@@ -15,7 +15,14 @@ test('offline source handoff pins exact bytes and never claims rendered or revie
  assert.ok(snapshot.mappingWarnings.includes('CLI_SOURCE_ONLY_NOT_RENDERED'));
  const schema=JSON.parse(await readFile(path.join(bundle,'response.schema.json'),'utf8'));
  assert.deepEqual(schema.required,Object.keys(schema.properties));assert.equal(schema.additionalProperties,false);
- assert.match(await readFile(path.join(bundle,'prompt.txt'),'utf8'),/untrusted document data/);
+ const request=JSON.parse(await readFile(path.join(bundle,'recognition-request.json'),'utf8'));
+ assert.ok(request.responseSchema.anyOf.some(branch=>branch.properties.marks?.minItems===1));
+ assert.ok(request.responseSchema.anyOf.some(branch=>branch.properties.pages?.minItems===1));
+ assert.equal(schema.anyOf,undefined);
+ const [instructions]=(await readFile(path.join(bundle,'prompt.txt'),'utf8')).split('\n\n{',1);
+ assert.match(instructions,/untrusted document data/);
+ assert.match(instructions,/if no safe change exists,? return both empty/i);
+ assert.doesNotMatch(instructions,/needs at least one mark or page contract|explicit user review before application|applyMarkProposal/);
  await assert.rejects(prepareHandoff(fixture,bundle),/EEXIST/);
  const first=snapshot.slides[0],node=first.nodes.find(n=>n.text==='业务增长复盘');
  const proposal={schemaVersion:1,templateSha256:snapshot.templateSha256,snapshotId:snapshot.snapshotId,marks:[{key:node.key,name:'@文本[4-20]',reason:'A report title, provisional range only'}],pages:[{path:first.path,pageType:'封面页',logic:['报告主题引出副标题'],reason:'Title and subtitle introduce the deck'}]};
@@ -55,17 +62,17 @@ test('Codex dry-run and missing consent never launch exec, do not save output, r
 
 test('public semantic-model fixture completes proposal -> marks -> compile -> fill -> generate twice -> package verify',()=>workspace(async dir=>{
  const {spawnSync}=await import('node:child_process');
- const run=(script,args)=>{const result=spawnSync(process.execPath,['--import','./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs',`packages/ppt-dsl/src/${script}.ts`,...args],{cwd:process.cwd(),encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);return result.stdout;};
+ const run=(script,args)=>{const result=spawnSync('npm',['run','--silent',script,'--',...args],{cwd:process.cwd(),encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);return result.stdout;};
  const bundle=path.join(dir,'bundle'),marked=path.join(dir,'marked'),compiled=path.join(dir,'compiled');
  await prepareHandoff(fixture,bundle);
  await applyHandoff(bundle,new URL('./fixtures/growth-semantic-proposal.json',import.meta.url),marked);
- run('compile-template',['--template',path.join(marked,'marked.pptx'),'--out',compiled]);
+ run('template:compile',['--template',path.join(marked,'marked.pptx'),'--out',compiled]);
  const manifest=path.join(compiled,'template-manifest.json'),template=path.join(compiled,'template.pptx'),input=new URL('./fixtures/growth-semantic-deck.json',import.meta.url).pathname;
- run('validate-input',['--manifest',manifest,'--input',input]);
+ run('deck:validate',['--manifest',manifest,'--input',input]);
  let previous;
  for(let i=0;i<2;i++){
-  const output=path.join(dir,`output-${i}.pptx`);run('generate-deck',['--template',template,'--manifest',manifest,'--input',input,'--out',output]);
-  assert.equal(JSON.parse(run('verify-deck',['--pptx',output])).passed,true);
+  const output=path.join(dir,`output-${i}.pptx`);run('deck:generate',['--template',template,'--manifest',manifest,'--input',input,'--out',output]);
+  assert.equal(JSON.parse(run('deck:verify',['--pptx',output])).passed,true);
   const slides=await readSourceSlides(await readFile(output));assert.equal(slides.length,9);
   assert.ok(slides[0].nodes.some(node=>node.text==='忠于原版的快速复用'));
   const content=slides.map(slide=>slide.nodes.map(({id,name,kind,box,text,parentId,children})=>({id,name,kind,box,text,parentId,children})));

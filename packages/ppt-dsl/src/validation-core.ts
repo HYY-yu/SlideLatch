@@ -248,4 +248,3 @@ function validateRichTextStructure(value: RichTextValue, label: string, errors: 
   });
   return valid;
 }
-

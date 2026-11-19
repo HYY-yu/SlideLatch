@@ -63,7 +63,7 @@ test('real compiler rejects role-free template, then accepts explicit metadata, 
  const dir=await mkdtemp(path.join(tmpdir(),'slidelatch-page-'));
  try{
   const {bytes}=await fixture();const input=path.join(dir,'plain.pptx');await writeFile(input,bytes);
-  const compile=(file,out)=>spawnSync(process.execPath,['--import','./packages/ppt-dsl/node_modules/tsx/dist/loader.mjs','packages/ppt-dsl/src/compile-template.ts','--template',file,'--out',out],{cwd:process.cwd(),encoding:'utf8'});
+  const compile=(file,out)=>spawnSync('npm',['run','--silent','template:compile','--','--template',file,'--out',out],{cwd:process.cwd(),encoding:'utf8'});
   const failed=compile(input,path.join(dir,'fail'));assert.notEqual(failed.status,0);assert.match(failed.stderr,/缺少有效页面类型/);
   for(const existing of [false,true]){
    const f=await fixture(existing),roles=['内容页','封面页','目录页','章节过渡页','结尾页'];

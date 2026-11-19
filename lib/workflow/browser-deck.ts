@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { SLIDELATCH_ANALYSIS_OPTIONS } from './page-contract.ts';
 import { assertBrowserPackageBudget, BROWSER_PACKAGE_BUDGET, type BrowserPackageEntry } from './browser-package-budget.ts';
 import { analyzeTemplate } from '../../packages/ppt-dsl/src/pptx/analyze.ts';
 import { lintTemplate } from '../../packages/ppt-dsl/src/lint.ts';
@@ -101,7 +102,7 @@ export async function loadBrowserTemplate(bytes: ArrayBuffer | Uint8Array, optio
   const sourceSlides = await readSourceSlides(pinned);
   const workspaceIssues = validateWorkspace(sourceSlides, {});
   if (workspaceIssues.length) throw new Error(`BROWSER_MARKS_INVALID: ${workspaceIssues.join('; ')}`);
-  const manifest = await analyzeTemplate(zip, 'template.pptx');
+  const manifest = await analyzeTemplate(zip, 'template.pptx', SLIDELATCH_ANALYSIS_OPTIONS);
   manifest.manifestVersion = TEMPLATE_MANIFEST_VERSION;
   manifest.templateSha256 = sourceSha256;
   const lint = lintTemplate(manifest);

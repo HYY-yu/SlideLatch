@@ -4,7 +4,7 @@ import type { Box, LoadedTemplate, Paint, Patches, RenderElement, SourceNode } f
 import { boxFor, frame, groupContent, matrixString, multiply, parentMatrix, worldFrame } from '@/lib/pptx/geometry';
 import { slideLists, listPreviewCount } from '@/lib/pptx/lists';
 import { safeRichText } from '@/lib/pptx/rich-text';
-import { gradientOffset, presetPath } from '@/lib/pptx/render-geometry';
+import { gradientOffset, presetPath, tableRowHeights } from '@/lib/pptx/render-geometry';
 
 type Props={model:LoadedTemplate;slideIndex:number;patches:Patches;selected?:string|null;selectedMembers?:string[];interactive?:boolean;onSelect?:(key:string|null)=>void;onSelectItem?:(key:string)=>void;onDrag?:(event:PointerEvent<SVGElement>,node:SourceNode,mode:'move'|'resize')=>void;svgRef?:React.Ref<SVGSVGElement>;locale?:'zh'|'en';textPreviews?:Record<string,string>;listPreviews?:Record<string,number>;onListPreview?:(key:string,count:number)=>void};
 const imageHref=(value:unknown)=>typeof value==='string'&&/^(data:image\/|blob:)/.test(value)?value:undefined;
@@ -23,20 +23,20 @@ function PaintDefs({paint,id,width,height}:{paint?:Paint;id:string;width:number;
 }
 const paintValue=(paint:Paint|undefined,id:string):string=>!paint?'none':paint.type==='color'?String(paint.value||'none'):paint.type==='image'||paint.type==='gradient'?`url(#${id})`:String((paint.value as {backgroundColor?:string})?.backgroundColor||'#e8ecea');
 
-function RichText({html,width,height,element,preview,workflowKey,workflowScope}:{html:string;width:number;height:number;element:RenderElement;preview?:string;workflowKey?:string;workflowScope?:'page-text'|'unsupported'}) {
+function RichText({html,width,height,element,preview,workflowKey,workflowScope,textOutlines}:{html:string;width:number;height:number;element:RenderElement;preview?:string;workflowKey?:string;workflowScope?:'page-text'|'unsupported';textOutlines?:RenderElement['textOutlines']}) {
   const inset=element.textInset||{};
-  const content=useMemo(()=>safeRichText(html,element.autoFit?.fontScale||1,preview),[html,element.autoFit?.fontScale,preview]);
+  const content=useMemo(()=>safeRichText(html,element.autoFit?.fontScale||1,preview,textOutlines),[html,element.autoFit?.fontScale,preview,textOutlines]);
   const align=element.vAlign==='mid'?'center':element.vAlign==='down'?'flex-end':'flex-start';
   return <foreignObject data-workflow-node-key={workflowKey} data-workflow-scope={workflowScope} width={Math.max(1,width)} height={Math.max(1,height)} style={{pointerEvents:'none',overflow:'hidden'}}><div data-workflow-text-box="" className="pptx-rich-text" style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',justifyContent:align,boxSizing:'border-box',padding:`${inset.t||0}px ${inset.r||0}px ${inset.b||0}px ${inset.l||0}px`,fontSize:18,lineHeight:1.1,overflow:'hidden',color:'#202832',whiteSpace:'normal',overflowWrap:'break-word'}}><div data-workflow-text-content="" dangerouslySetInnerHTML={{__html:content}}/></div></foreignObject>;
 }
 function TableView({element,width,height}:{element:RenderElement;width:number;height:number}) {
   const rows=element.data as {text:string;fillColor?:string;rowSpan?:number;colSpan?:number;hMerge?:number;vMerge?:number;borders?:Record<string,{borderColor:string;borderWidth:number}>}[][];
-  const rowHeights=element.rowHeights as number[]||[];
+  const rowHeights=tableRowHeights(element.rowHeights as number[]||[],rows?.length||0,height);
   const columns=element.colWidths as number[]||[];
   const sum=(xs:number[])=>xs.reduce((a,b)=>a+b,0)||1;
   let y=0;
   return <g>{(rows||[]).map((row,r)=>{
-    let x=0;const h=(rowHeights[r]||1)/sum(rowHeights.length?rowHeights:rows.map(()=>1))*height;
+    let x=0;const h=rowHeights[r];
     const cells=row.map((cell,c)=>{
       const w=(columns[c]||1)/sum(columns.length?columns:row.map(()=>1))*width;
       const cellX=x;x+=w;
@@ -98,14 +98,15 @@ export default function SvgSlide({model,slideIndex,patches,selected,selectedMemb
       body=<><defs><clipPath id={`${pid}-clip`}>{element.geom==='ellipse'?<ellipse cx={b.width/2} cy={b.height/2} rx={b.width/2} ry={b.height/2}/>:<rect width={b.width} height={b.height}/>}</clipPath></defs><image href={src} x={-left*dw} y={-top*dh} width={dw} height={dh} preserveAspectRatio="none" clipPath={`url(#${pid}-clip)`}/></>;
     }else if(element.type==='shape'||element.type==='text'){
       const stroke=element.borderWidth?element.borderColor||'#000':'none',strokeWidth=element.borderWidth||0;
+      const strokeDasharray=element.borderType==='dashed'?'5 3':element.borderType==='dotted'?'1 2':undefined;
       let geometry:ReactNode;
       const correctedPath=node&&presetPath(node.geometry,b.width,b.height);
-      if(correctedPath)geometry=<path d={correctedPath} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
-      else if(element.path&&pathBox&&pathBox.width>0&&pathBox.height>0)geometry=<svg width={Math.max(.01,b.width)} height={Math.max(.01,b.height)} viewBox={`${pathBox.x} ${pathBox.y} ${pathBox.width} ${pathBox.height}`} preserveAspectRatio="none" overflow="visible"><path d={element.path} fill={paint} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={element.borderType==='dashed'?'5 3':element.borderType==='dotted'?'1 2':undefined}/></svg>;
+      if(correctedPath)geometry=<path d={correctedPath} fill={paint} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray}/>;
+      else if(element.path&&pathBox&&pathBox.width>0&&pathBox.height>0)geometry=<svg width={Math.max(.01,b.width)} height={Math.max(.01,b.height)} viewBox={`${pathBox.x} ${pathBox.y} ${pathBox.width} ${pathBox.height}`} preserveAspectRatio="none" overflow="visible"><path d={element.path} fill={paint} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray}/></svg>;
       else if(element.shapType==='ellipse')geometry=<ellipse cx={b.width/2} cy={b.height/2} rx={b.width/2} ry={b.height/2} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
       else if(element.shapType==='line'||b.height===0)geometry=<path d={`M0 0L${b.width} ${b.height}`} fill="none" stroke={stroke} strokeWidth={strokeWidth}/>;
       else geometry=<rect width={b.width} height={b.height} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
-      body=<><defs><PaintDefs paint={element.fill} id={pid} width={b.width} height={b.height}/></defs>{geometry}{element.content&&b.height>0&&!image&&<RichText html={element.content} width={b.width} height={b.height} element={element} preview={node?textPreviews[node.key]:undefined} workflowKey={!instance?node?.key:undefined} workflowScope={node&&node.kind==='sp'&&!childIds.has(node.id)&&!layout&&!instance&&!node.parentId&&!listNodeKeys.has(node.key)&&!node.rotation&&!element.rotate&&!node.flipH&&!node.flipV&&!element.isFlipH&&!element.isFlipV&&!node.dataKind&&!node.hasImage?'page-text':'unsupported'}/>}</>;
+      body=<><defs><PaintDefs paint={element.fill} id={pid} width={b.width} height={b.height}/></defs>{geometry}{element.content&&b.height>0&&!image&&<RichText html={element.content} textOutlines={element.textOutlines} width={b.width} height={b.height} element={element} preview={node?textPreviews[node.key]:undefined} workflowKey={!instance?node?.key:undefined} workflowScope={node&&node.kind==='sp'&&!childIds.has(node.id)&&!layout&&!instance&&!node.parentId&&!listNodeKeys.has(node.key)&&!node.rotation&&!element.rotate&&!node.flipH&&!node.flipV&&!element.isFlipH&&!element.isFlipV&&!node.dataKind&&!node.hasImage?'page-text':'unsupported'}/>}</>;
     }else body=<g><rect width={b.width} height={b.height} fill="#f0ede8" stroke="#c5b999"/><text x="5" y="16" fontSize="10" fill="#756c58">{element.type}</text></g>;
     return <g key={key} id={node?`${prefix}-${instance}node-${node.id}`:undefined} transform={matrixString(m)} data-shape-id={node?.id} data-workflow-node-key={!instance?node?.key:undefined}>
       {body}

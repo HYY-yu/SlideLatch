@@ -20,14 +20,14 @@ npm run ai:prepare -- --template /absolute/path/input.pptx --out /absolute/path/
 
 该离线命令绑定原 PPTX 字节和快照，输出请求、Schema、提示词与原稿副本。它只读取 OOXML，未渲染页面，也不假造映射成功或视觉通过记录。任意讲者备注不进入此命令，只传入已有的结构化页面合同。Skill 通过 Studio 操作接口读取的数据则以当前渲染工作区为准。
 
-AI 读取 `recognition-request.json` / `prompt.txt` 后，生成含 `marks` 和/或 `pages` 的提案并执行本地校验与应用：
+在已有 AI 会话中读取 `recognition-request.json`，按其中的 Schema 输出至少一条安全的 `marks` 或 `pages`。无安全修改时说明结果并跳过应用。`prompt.txt` 与 `response.schema.json` 用于可选 Codex CLI，两个空数组表示 `no_safe_changes`。只有非空提案才进入本地校验与应用。
 
 ```sh
 npm run ai:apply -- --bundle /absolute/path/new-handoff \
   --proposal /absolute/path/proposal.json --out /absolute/path/new-marked
 ```
 
-只允许写名称标记和专用页面合同，不能通过提案偷偷改正文、几何或任意备注。输出是 `needs_review` 的 `marked.pptx`，由 AI 加载到 Studio 并完成可执行的边界检查，再交用户验收。确认后如需正式发布，仍经过 release 门禁。输出目录必须是新目录，防止覆盖已有资料。
+应用只向副本写入名称标记和专用页面合同，保留正文、几何和原讲者备注。AI 将 `needs_review` 的 `marked.pptx` 加载到 Studio，完成适用边界检查，再交用户确认标记和页面合同。正式发布仍须通过独立的 release 门禁。输出目录必须是新目录，防止覆盖已有资料。
 
 ### 用户主动启动已有 Codex CLI
 

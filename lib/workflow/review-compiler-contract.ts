@@ -1,5 +1,5 @@
-import type { TemplateManifest } from "./types.js";
-import { assertRuntimeManifestComplete } from "./manifest-contract.js";
+import type { TemplateManifest } from "../../packages/ppt-dsl/src/types.ts";
+import { assertRuntimeManifestComplete } from "../../packages/ppt-dsl/src/manifest-contract.ts";
 type ProbeContract = { key: string; kind: "text" | "list"; boundary: "min" | "max"; value: number };
 /** Compare exact compiler-resolved locators, including inherited list contracts.
  * This verifies coverage only, not observation authenticity or visual correctness.

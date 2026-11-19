@@ -1,32 +1,24 @@
 # SlideLatch
 
-中文优先，产品界面保留中英文。SlideLatch 是产品，PPT-DSL 是内部合同与确定性运行时。源 PPTX 的对象、几何、样式和资源是设计来源，禁止把重新绘制当作原版复用。
+中文优先，产品界面保留中英文。SlideLatch 是产品，PPT-DSL 是内部合同与确定性运行时。用源 PPTX 的真实对象、几何、样式和资源复用设计，禁止用重绘代替。
 
 ## 开发循环 A
 
-- 非简单任务先用 pstack:poteto-mode 设计、实现、实测。若运行环境未加载 pstack，读取本地已安装 Skill；不可声称未执行的流程已完成。
-- 先读 docs/team-workflow.md 和 docs/loop-a-backlog.md，再按 .codex/agents/ 的职责分派。
-- 每个工作项一个 owner。每名写入者用独立 worktree 和分支。新工作创建 draft PR，已有 PR 修复复用原 PR，不覆盖其他写入者或用户的未提交文件。
-- 设计先说明输入、输出、不变量、失败状态和验收。修改行为时同步回归测试。
-- 提交交付前运行 npm run verify。按变更范围提供真实浏览器、OOXML 包检查与原生 Microsoft PowerPoint 证据；不适用的检查说明原因。不能以 CI 绿灯代替浏览器或 PowerPoint 原生检查。
-- 非作者 verifier 验收精确 head SHA。新提交使旧结论失效；集成人员重新读取远程 SHA、CI 和验收。
-- 开发循环通过现有 loop 提示词、pstack 和 PR 推进，不依赖已删除的开发或验证 Skill。优先推进已有 PR；无可推进 PR 时，优先处理用户已确认且无人负责的产品 Issue。没有 Issue 不阻止从已授权计划选择小任务。coordinator 从已授权目标生成精确 scope，不要求用户逐项填路径。
-- 以用户的 PR #23 为准，docs/team-workflow.md 与 .codex/agents/ 中对已删除开发或验证 Skill 的旧引用不再是执行前提；以本 AGENTS.md 和用户当前授权为准。不复制或恢复旧 Skill，不借用旧 capability。
-- 用户允许通过独立验收的 PR 普通合并，正常 main 合并可以触发部署。每轮核实当前授权、head/base、CI 与未决审查，记录真实 merge SHA 和对应 production 结果。权限、凭据、分支保护、新服务或后台调度仍需相应授权，不能把绿灯当授权。
-- 不为了通过检查删除关键测试、降低门槛或将失败改为跳过。重大合同、数据路径、成本、依赖和保真范围变更须人类决定。
+- 非简单任务使用 `pstack:poteto-mode` 设计、实现和实测。运行环境未加载时读取本地已安装 Skill。
+- 按[团队协议](docs/team-workflow.md)和[单轮提示词](docs/loop-a-once.md)推进已授权工作。协调者核实当前 PR 和队列，生成执行范围，按 `.codex/agents/` 的职责分派。每项工作一个 owner，写入者使用独立 worktree 和分支，保护他人及用户未提交的改动。新工作经独立复核后开 draft PR，已有 PR 修复复用原 PR。
+- 设计说明输入、输出、不变量、失败行为和验收。行为变更补回归。交付前运行 `npm run verify`，由非作者复核精确 head SHA。新提交须重新验收。按变更范围提供真实浏览器、OOXML、原生 Microsoft PowerPoint 证据，注明不适用或阻塞项。三类证据和 CI 分别记录。
+- 在用户现行授权内，可普通合并通过独立验收的 PR，正常 main 合并可触发部署。合并前核实授权、head/base、CI 和未决审查，合并后核对真实 merge SHA 和对应 production 结果。
+- 保留关键测试和验收门槛，按实记录失败。重大合同、数据路径、成本、依赖、保真范围及仓库权限、凭据、分支保护、新服务、后台调度变更须按[团队协议](docs/team-workflow.md#人类决定)取得授权。只使用当前任务的 capability。
+
+## PPT-DSL 上游维护
+
+- 在规划任务和提交 PR 时明确改动归属。通用 DSL 语法、Manifest 与 Schema、模板编译、选页、填充校验、PPTX 生成与 OOXML 检查归 [ppt-dsl-generator](https://github.com/HYY-yu/ppt-dsl-generator)。
+- 修改公共运行时时，先在上游提交代码和回归测试。上游合并后，再在 SlideLatch 更新 `packages/ppt-dsl` 的源码快照，并记录所用 Git commit SHA。跨仓库改动在 SlideLatch PR 中链接上游 PR 和所用提交。同步以 GitHub 为来源。
+- SlideLatch 负责 Studio、语义打标、专用页面备注、人工验收和发布门禁。两个 Skill 独立维护。
 
 ## 产品与数据边界
 
-- 循环 B 是真实 PPT 的导入、语义标记、边界探索、原生验收、编译与复用。本次先完成循环 A；不启动批量采集或自动处理 PPT。
-- 只用已授权样本。不得把客户 PPT、个人文件、讲者备注、密钥或私有素材提交到公开仓库、CI 日志或新服务。
-- 浏览器 SVG 是近似预览，OOXML 包检查是结构证据，PowerPoint 原生截图是独立视觉证据，三者不能相互替代。
-- 原稿 SHA、工作区 snapshot、提案与审查记录保持绑定。更改标记或合同后，旧边界观察失效。不得伪造观察记录解锁 release。
-- 无模型的规则识别不得称为 AI 语义理解。新增模型调用、付费服务、软件或大依赖须符合用户授权。
-- PPT 产品操作适用时可读 .agents/skills/slidelatch-workflow/SKILL.md，它不是开发循环的前提；开发测试不自动运行 ai:codex，不接入常驻模型。
-
-## 回归检查
-
-| 规则 | 执行机制 |
-| --- | --- |
-| 应用中的原生弹窗通过 `components/modal-dialog.tsx` 渲染。仅在允许点击遮罩关闭的弹窗上设置 `dismissOnBackdrop`。 | `tests/modal-dialog-boundary.test.mjs` 定位绕过组件的 JSX，`tests/dialog.test.mjs` 验证遮罩兼容行为。两项均由 `npm run verify` 执行。 |
-| Studio 审查和调整已标记的 PPTX。AI 语义标记和成稿生成由 SlideLatch Skill 处理。 | `StudioShell` 的类型限定审查界面输入，`tests/studio-route.test.mjs` 检查中英文界面的审查操作。产品范围由人工验收。 |
+- Studio 审核与微调已标记稿，由 [SlideLatch Skill](.agents/skills/slidelatch-workflow/SKILL.md) 完成语义打标与成稿。循环 B 按当轮明确授权执行。批量采集或自动处理 PPT 需单独授权。开发测试不自动运行 `ai:codex` 或接入常驻模型。
+- 只用已授权样本。客户 PPT、个人文件、讲者备注、密钥及私有素材留在获准范围内，禁止写入公开仓库、CI 日志或新服务。新增模型调用、付费服务和软件须符合本轮授权。
+- 保持原稿 SHA、工作区快照、提案与审查记录绑定。标记或合同变更使旧观察失效。release 的观察必须来自实测。规则候选只代表结构推断。
+- 用 `components/modal-dialog.tsx` 渲染原生弹窗。仅在允许遮罩关闭的弹窗设置 `dismissOnBackdrop`。
