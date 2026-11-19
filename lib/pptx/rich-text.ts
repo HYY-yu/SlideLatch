@@ -1,7 +1,7 @@
 const tags=new Set(['p','span','br','b','strong','em','i','u','s','sub','sup','ol','ul','li']);
 const properties=new Set(['color','font-family','font-size','font-weight','font-style','line-height','text-align','margin-left','margin-right','margin-top','margin-bottom','text-indent','text-decoration','letter-spacing','vertical-align','padding-left','list-style-type']);
 /** The parser emits HTML. Rebuild an allowlisted fragment; never attach original HTML or events. */
-export function safeRichText(html:string,fontScale=1,preview?:string):string {
+export function safeRichText(html:string,fontScale=1,preview?:string,wrap=true):string {
   const doc=new DOMParser().parseFromString(html,'text/html');
   const clean=(node:Node):Node=>{
     if(node.nodeType===3)return doc.createTextNode(node.textContent||'');
@@ -30,7 +30,8 @@ export function safeRichText(html:string,fontScale=1,preview?:string):string {
     const first=wrapper.querySelector('span')||wrapper.querySelector('p')||wrapper;
     const run=first.cloneNode(false) as HTMLElement;
     run.textContent=preview;
-    run.style.whiteSpace='pre-wrap';
+    run.setAttribute('data-workflow-sample','');
+    run.style.whiteSpace=wrap?'pre-wrap':'pre';
     const paragraph=wrapper.querySelector('p')?.cloneNode(false) as HTMLElement|undefined;
     wrapper.replaceChildren();
     if(paragraph&&first.localName!=='p'){paragraph.appendChild(run);wrapper.appendChild(paragraph);}

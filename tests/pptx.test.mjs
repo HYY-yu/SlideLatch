@@ -31,6 +31,20 @@ test('all 33 slides and all 279 marked components retain their original OOXML id
  assert.ok(slides[2].nodes.some(n=>n.kind==='grpSp'&&n.name==='@1@1[3-5]'));
 });
 
+test('locking measured text size replaces native shrink-to-fit and preserves the source text and box',async()=>{
+ const slide=slides[0],title=slide.nodes.find(node=>node.hasAutoShrink&&node.hasTextBody);
+ assert.ok(title);
+ const updated=await writePptx(original,{[title.key]:{fixedTextSize:true}});
+ const stored=(await readSourceSlides(updated))[0].nodes.find(node=>node.key===title.key);
+ assert.equal(stored.hasAutoShrink,undefined);
+ assert.equal(stored.text,title.text);
+ assert.deepEqual(stored.box,title.box);
+ const zip=await JSZip.loadAsync(updated);
+ assert.match(await zip.file(slide.path).async('string'),/<a:noAutofit[\s/]/);
+ const withoutShrink=slide.nodes.find(node=>node.hasTextBody&&!node.hasAutoShrink);
+ await assert.rejects(writePptx(original,{[withoutShrink.key]:{fixedTextSize:true}}),/PATCH_TEXT_AUTOFIT/);
+});
+
 test('patches round-trip names, sizes and group-local positions while retaining every untouched ZIP part',async t=>{
  const title=slides[0].nodes.find(n=>n.id==='3');
  const group=slides[2].nodes.find(n=>n.name==='@1@1[3-5]');

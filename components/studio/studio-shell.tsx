@@ -6,7 +6,7 @@ import type {LoadedTemplate,Patches} from '@/lib/pptx/types';
 import SvgSlide from '../pptx/svg-slide';
 import styles from './studio-shell.module.css';
 
-type Props={locale:Locale;model:LoadedTemplate|null;fileName:string;loading:boolean;busy:boolean;error:string;page:number;committedPatches:Patches;textPreviews:Record<string,string>;properties:ReactNode;onLocateIssue:(issue:string)=>void;onPage:(page:number)=>void;onOpen:()=>void;onRetry:()=>void;input:ReactNode;canvas:ReactNode;actions:ReactNode;issues:string[];onExport:()=>void;exportBlocked:boolean;exporting:boolean;download:{url:string;name:string;report:string}|null};
+type Props={locale:Locale;model:LoadedTemplate|null;fileName:string;loading:boolean;busy:boolean;error:string;page:number;committedPatches:Patches;textPreviews:Record<string,string>;properties:ReactNode;workflow?:ReactNode;onLocateIssue:(issue:string)=>void;onPage:(page:number)=>void;onOpen:()=>void;onRetry:()=>void;input:ReactNode;canvas:ReactNode;actions:ReactNode;issues:string[];onExport:()=>void;exportBlocked:boolean;exporting:boolean;download:{url:string;name:string;report:string}|null};
 
 export default function StudioShell(p:Props){
   const zh=p.locale==='zh';
@@ -36,6 +36,7 @@ export default function StudioShell(p:Props){
       </section>
       <aside className={styles.inspector} aria-label={zh?'对象属性':'Object inspector'}>
         <div className={styles.inspectorTabs} role="tablist" aria-label={zh?'对象属性':'Object inspector'}>{(['properties','issues'] as const).map(key=><button key={key} role="tab" aria-selected={tab===key} className={tab===key?styles.active:''} onClick={()=>setTab(key)}>{key==='properties'?(zh?'属性':'Properties'):(zh?'问题':'Issues')}{key==='issues'&&p.issues.length?` · ${p.issues.length}`:''}</button>)}</div>
+        {p.workflow}
         {tab==='issues'?<div className={styles.issueList}>{p.issues.length?p.issues.map((issue,i)=><button key={i} onClick={()=>{p.onLocateIssue(issue);setTab('properties')}}>{issue}</button>):<p>{zh?'当前无已报告问题':'No reported issues'}</p>}</div>:p.properties}
       </aside>
       <aside className={styles.panel} hidden={!exportOpen} aria-label={zh?'文档操作面板':'Document actions'}>

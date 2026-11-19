@@ -12,7 +12,7 @@
 
 ## 产品与数据边界
 
-- Studio 审核与微调已标记稿，由 [SlideLatch Skill](.agents/skills/slidelatch-workflow/SKILL.md) 完成语义打标与成稿。循环 B 按当轮明确授权执行。批量采集或自动处理 PPT 需单独授权。开发测试不自动运行 `ai:codex` 或接入常驻模型。
+- AI 在 Studio 中测量源稿的文字容量、识别和试排重复对象，再提交语义标记。用户在 Studio 验收与微调标记稿。[SlideLatch Skill](.agents/skills/slidelatch-workflow/SKILL.md) 负责引导 AI 操作工作台、编译和成稿。循环 B 按当轮明确授权执行。批量采集或自动处理 PPT 需单独授权。开发测试不自动运行 `ai:codex` 或接入常驻模型。
 - 只用已授权样本。客户 PPT、个人文件、讲者备注、密钥及私有素材留在获准范围内，禁止写入公开仓库、CI 日志或新服务。新增模型调用、付费服务和软件须符合本轮授权。
 - 保持原稿 SHA、工作区快照、提案与审查记录绑定。标记或合同变更使旧观察失效。release 的观察必须来自实测。规则候选只代表结构推断。
 - 用 `components/modal-dialog.tsx` 渲染原生弹窗。仅在允许遮罩关闭的弹窗设置 `dismissOnBackdrop`。

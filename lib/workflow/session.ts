@@ -138,7 +138,7 @@ export function createBoundaryProbes(model:LoadedTemplate,patches:Patches,snapsh
   const probes:BoundaryProbe[]=[],{ranges}=resolveProbeContracts(model,patches);
   for(const [slideIndex,slide]of model.slides.entries()){
     for(const list of slideLists(slide.nodes,patches))if(list.grouped)for(const boundary of ['min','max'] as const)probes.push({id:`${list.key}:${boundary}`,snapshotId,key:list.controller.key,slideIndex,kind:'list',boundary,value:list[boundary],listKey:list.key,
-      limitation:'SVG list-count preview is approximate and does not use the native generator layout. Only the first 100 items are rendered.'});
+      limitation:'SVG list-count preview uses the generator layout for up to 100 items. Native font, drawing and rendering checks require PowerPoint.'});
     for(const node of slide.nodes){const range=ranges.get(node.key);if(!range)continue;
       for(const boundary of ['min','max'] as const)probes.push({id:`${node.key}:text:${boundary}`,snapshotId,key:node.key,slideIndex,kind:'text',boundary,value:range[boundary],text:sampleText(node,range[boundary],patches),
         limitation:range[boundary]>MAX_PROBE_TEXT?'Boundary exceeds safe preview limit and cannot be approved.':'Sample uses repeated existing semantic text. Different content can have different line wrapping.'});

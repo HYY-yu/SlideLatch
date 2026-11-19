@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { searchTextCapacity, stressText, MAX_SEARCH_WINDOW } from '../lib/workflow/constraint-search.ts';
-import { measurePreviewText } from '../lib/workflow/measure-preview.ts';
-const input={snapshotId:'snapshot',key:'slide#text',lower:1,upper:6,samples:[{id:'semantic',seed:'Revenue增长😀'}]};
+import { searchTextCapacity, stressText, MAX_SEARCH_LENGTH } from '../lib/workflow/constraint-search.ts';
+import { meaningfulTextLength } from '../packages/ppt-dsl/src/text-length.ts';
+import { measurePreviewText, rankWideGlyphs } from '../lib/workflow/measure-preview.ts';
+const input={snapshotId:'snapshot',key:'slide#text',lower:1,upper:6,mode:'exhaustive',samples:[{id:'semantic',seed:'Revenue增长😀'}]};
 const evidence=fits=>({fits,reason:'Deterministic test measurement'});
 test('exhaustive search retains non-monotone ranges and conservative prefix',async()=>{
  const seen=[];
@@ -24,7 +25,7 @@ test('unknown and thrown measurements are inconclusive, never passing',async()=>
  assert.deepEqual(report.feasibleRanges,[{min:1,max:1},{min:4,max:6}]);
 });
 test('malformed bounds and oversized workloads fail before measurement',async()=>{
- for(const bounds of [{lower:-1},{upper:0},{lower:1.2},{upper:Infinity},{upper:10001},{upper:MAX_SEARCH_WINDOW+1}]){
+ for(const bounds of [{lower:-1},{upper:0},{lower:1.2},{upper:Infinity},{upper:MAX_SEARCH_LENGTH+1}]){
   await assert.rejects(searchTextCapacity({...input,...bounds},{measure:async()=>{throw new Error('must not run');}}),/SEARCH_INVALID_BOUNDS/);
  }
  await assert.rejects(searchTextCapacity({...input,samples:Array(7).fill({id:'x',seed:'x'})},{measure:async()=>evidence(true)}),/SEARCH_INVALID_SAMPLES/);
@@ -44,11 +45,37 @@ test('stale snapshot before and after await invalidates results',async()=>{
  const initial=await searchTextCapacity(input,{isCurrent:()=>false,measure:async()=>{throw new Error('must not run');}});
  assert.equal(initial.status,'stale');assert.equal(initial.candidates.length,0);
 });
-test('stress strings have exact Unicode codepoint lengths without invisible padding',()=>{
- for(const seed of ['收入增长','MW','😀Revenue','a\u200b b\n'])for(const length of [0,1,2,11,128]){
-  const value=stressText(seed,length);assert.equal(Array.from(value).length,length);assert.doesNotMatch(value,/[\p{C}\p{Z}\s]/u);
+test('measured prefixes can exceed 128 and report each sample boundary separately',async()=>{
+ const limits={semantic:167,'cjk-wide':139,'latin-wide':152};
+ const report=await searchTextCapacity({...input,upper:MAX_SEARCH_LENGTH,mode:'prefix',wideSamples:{cjk:'繁體國',latin:'WWW WMW'}},{measure:async c=>evidence(c.length<=limits[c.sampleId])});
+ assert.equal(report.recommendedMax,139);
+ assert.deepEqual(report.feasibleRanges,[{min:1,max:139}]);
+ assert.deepEqual(report.familyLimits.map(f=>[f.sampleId,f.maxFit,f.firstFailure,f.lastMeasured]),[
+  ['semantic',167,168,168],['cjk-wide',139,140,140],['latin-wide',152,153,153],
+ ]);
+ assert.ok(report.candidates.some(c=>c.sampleId==='latin-wide'&&c.text.includes(' ')));
+ assert.equal(report.observationCount,168+140+153);
+ assert.ok(report.candidates.length<report.observationCount);
+ assert.ok(report.candidates.every(c=>c.length<=limits[c.sampleId]+1));
+ assert.ok(report.candidates.some(c=>c.sampleId==='semantic'&&c.length===167&&c.evidence.fits));
+ assert.ok(report.candidates.some(c=>c.sampleId==='semantic'&&c.length===168&&c.evidence.fits===false));
+});
+test('stress strings keep word boundaries and match the runtime length policy',()=>{
+ for(const seed of ['收入增长','MW','𠮷😀Revenue','a​ b\n','Hello   world','é'])for(const length of [0,1,2,11,128]){
+  const value=stressText(seed,length);
+  assert.deepEqual(meaningfulTextLength(value),{length,hasInvalidCharacters:false});
  }
- assert.throws(()=>stressText('\u200b \n',3),/SEARCH_INVALID_SAMPLE/);
+ assert.equal(stressText('Hello world',11),'Hello world');
+ assert.equal(stressText('𠮷😀Revenue',2),'𠮷😀');
+ assert.equal(stressText('é',2),'é');
+ assert.throws(()=>stressText('​ \n',3),/SEARCH_INVALID_SAMPLE/);
+});
+test('wide sample ranking uses measured font advance or ink breadth',()=>{
+ const metrics={W:[10,13],i:[4,5],M:[11,11],'中':[13,13],'寬':[14,14]};
+ const rank=rankWideGlyphs('iiWMM中寬',glyph=>({
+  width:metrics[glyph][0],actualBoundingBoxLeft:0,actualBoundingBoxRight:metrics[glyph][1],
+ }));
+ assert.equal(rank,'寬W中Mi');
 });
 test('DOM helper does not pass unknown or disconnected geometry',async()=>{
  assert.equal((await measurePreviewText({isConnected:false},'x')).fits,null);
@@ -76,6 +103,7 @@ test('DOM evidence catches negative centered clipping and scroll overflow',async
 });
 test('DOM evidence refuses unsupported scope or rotated geometry',async()=>{
  assert.equal((await measurePreviewText(previewFixture({scope:'group-text'}),'x')).fits,null);
+ assert.equal((await measurePreviewText(previewFixture({scope:'group-text'}),'x',{scope:'group-text',settle:'layout'})).fits,true);
  assert.equal((await measurePreviewText(previewFixture({rotated:true}),'x')).fits,null);
 });
 
