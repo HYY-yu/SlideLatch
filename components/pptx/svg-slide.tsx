@@ -1,12 +1,19 @@
 'use client';
 import { useId, useMemo, type PointerEvent, type ReactNode } from 'react';
 import type { Box, LoadedTemplate, Paint, Patches, RenderElement, SourceNode } from '@/lib/pptx/types';
-import { boxFor, frame, groupContent, matrixString, multiply, parentMatrix, worldFrame } from '@/lib/pptx/geometry';
+import { boxFor, frame, groupContent, matrixString, worldFrame } from '@/lib/pptx/geometry';
 import { slideLists, listPreviewCount } from '@/lib/pptx/lists';
+import { previewListLayout } from '@/lib/workflow/repeated-elements';
 import { safeRichText } from '@/lib/pptx/rich-text';
 import { gradientOffset, presetPath, tableRowHeights } from '@/lib/pptx/render-geometry';
 
-type Props={model:LoadedTemplate;slideIndex:number;patches:Patches;selected?:string|null;selectedMembers?:string[];interactive?:boolean;onSelect?:(key:string|null)=>void;onSelectItem?:(key:string)=>void;onDrag?:(event:PointerEvent<SVGElement>,node:SourceNode,mode:'move'|'resize')=>void;svgRef?:React.Ref<SVGSVGElement>;locale?:'zh'|'en';textPreviews?:Record<string,string>;listPreviews?:Record<string,number>;onListPreview?:(key:string,count:number)=>void};
+export type ListLayoutTrial = {
+  items: {rootKeys: string[]; box: Box}[];
+  slots: {sourceIndex: number; box: Box}[];
+  conflicts?:number[];
+};
+
+type Props={model:LoadedTemplate;slideIndex:number;patches:Patches;selected?:string|null;selectedMembers?:string[];interactive?:boolean;onSelect?:(key:string|null)=>void;onSelectItem?:(key:string)=>void;onDrag?:(event:PointerEvent<SVGElement>,node:SourceNode,mode:'move'|'resize')=>void;svgRef?:React.Ref<SVGSVGElement>;locale?:'zh'|'en';textPreviews?:Record<string,string>;listPreviews?:Record<string,number>;measurement?:{key:string;text?:string}|null;fixedFontKey?:string;listTrial?:ListLayoutTrial|null;onListPreview?:(key:string,count:number)=>void};
 const imageHref=(value:unknown)=>typeof value==='string'&&/^(data:image\/|blob:)/.test(value)?value:undefined;
 function PaintDefs({paint,id,width,height}:{paint?:Paint;id:string;width:number;height:number}) {
   if(!paint)return null;
@@ -23,11 +30,13 @@ function PaintDefs({paint,id,width,height}:{paint?:Paint;id:string;width:number;
 }
 const paintValue=(paint:Paint|undefined,id:string):string=>!paint?'none':paint.type==='color'?String(paint.value||'none'):paint.type==='image'||paint.type==='gradient'?`url(#${id})`:String((paint.value as {backgroundColor?:string})?.backgroundColor||'#e8ecea');
 
-function RichText({html,width,height,element,preview,workflowKey,workflowScope,textOutlines}:{html:string;width:number;height:number;element:RenderElement;preview?:string;workflowKey?:string;workflowScope?:'page-text'|'unsupported';textOutlines?:RenderElement['textOutlines']}) {
+function RichText({html,width,height,element,preview,workflowKey,workflowScope,fixedFont=false,wrap=true}:{html:string;width:number;height:number;element:RenderElement;preview?:string;workflowKey?:string;workflowScope?:'page-text'|'group-text'|'unsupported';fixedFont?:boolean;wrap?:boolean}) {
   const inset=element.textInset||{};
-  const content=useMemo(()=>safeRichText(html,element.autoFit?.fontScale||1,preview,textOutlines),[html,element.autoFit?.fontScale,preview,textOutlines]);
+  const fontScale=fixedFont?1:element.autoFit?.fontScale||1;
+  const {textOutlines}=element;
+  const content=useMemo(()=>safeRichText(html,fontScale,preview,wrap,textOutlines),[html,fontScale,preview,wrap,textOutlines]);
   const align=element.vAlign==='mid'?'center':element.vAlign==='down'?'flex-end':'flex-start';
-  return <foreignObject data-workflow-node-key={workflowKey} data-workflow-scope={workflowScope} width={Math.max(1,width)} height={Math.max(1,height)} style={{pointerEvents:'none',overflow:'hidden'}}><div data-workflow-text-box="" className="pptx-rich-text" style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',justifyContent:align,boxSizing:'border-box',padding:`${inset.t||0}px ${inset.r||0}px ${inset.b||0}px ${inset.l||0}px`,fontSize:18,lineHeight:1.1,overflow:'hidden',color:'#202832',whiteSpace:'normal',overflowWrap:'break-word'}}><div data-workflow-text-content="" dangerouslySetInnerHTML={{__html:content}}/></div></foreignObject>;
+  return <foreignObject data-workflow-node-key={workflowKey} data-workflow-scope={workflowScope} width={Math.max(1,width)} height={Math.max(1,height)} style={{pointerEvents:'none',overflow:'hidden'}}><div data-workflow-text-box="" className="pptx-rich-text" style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',justifyContent:align,boxSizing:'border-box',padding:`${inset.t||0}px ${inset.r||0}px ${inset.b||0}px ${inset.l||0}px`,fontSize:18,lineHeight:1.1,overflow:'hidden',color:'#202832',whiteSpace:wrap?'normal':'nowrap',overflowWrap:wrap?'break-word':'normal'}}><div data-workflow-text-content="" dangerouslySetInnerHTML={{__html:content}}/></div></foreignObject>;
 }
 function TableView({element,width,height}:{element:RenderElement;width:number;height:number}) {
   const rows=element.data as {text:string;fillColor?:string;rowSpan?:number;colSpan?:number;hMerge?:number;vMerge?:number;borders?:Record<string,{borderColor:string;borderWidth:number}>}[][];
@@ -64,16 +73,23 @@ function ChartView({element,width,height}:{element:RenderElement;width:number;he
   return <g><path d={`M ${pad} 0 V ${h} H ${pad+w}`} stroke="#bdc8c2" fill="none" strokeWidth=".5"/>{[0,.25,.5,.75,1].map(value=><g key={value}><path d={`M ${pad} ${h*(1-value)} H ${pad+w}`} stroke="#dce4e0" strokeWidth=".4"/><text x={pad-5} y={h*(1-value)+3} textAnchor="end" fontSize="8" fill="#63726a">{Math.round(value*max)}</text></g>)}{data.map((series,s)=>type.includes('line')?<polyline key={s} points={series.values.map((v,i)=>`${pad+(i+.5)*w/values.length},${h-v.y/max*h}`).join(' ')} fill="none" stroke={colors[s%colors.length]||'#176b50'} strokeWidth="2"/>:<g key={s}>{series.values.map((v,i)=><rect key={i} x={pad+(i+.13)*w/values.length+s*w/values.length*.7/data.length} y={h-v.y/max*h} width={w/values.length*.7/data.length} height={Math.max(0,v.y/max*h)} fill={colors[s%colors.length]||'#176b50'}/>)}</g>)}{values.map((v,i)=><text key={i} x={pad+(i+.5)*w/values.length} y={h+15} textAnchor="middle" fontSize="8" fill="#63726a">{labels[v.x]||v.x}</text>)}</g>;
 }
 
-export default function SvgSlide({model,slideIndex,patches,selected,selectedMembers=[],interactive=false,onSelect,onSelectItem,onDrag,svgRef,locale='zh',textPreviews={},listPreviews={},onListPreview}:Props) {
+export default function SvgSlide({model,slideIndex,patches,selected,selectedMembers=[],interactive=false,onSelect,onSelectItem,onDrag,svgRef,locale='zh',textPreviews={},listPreviews={},measurement,fixedFontKey,listTrial,onListPreview}:Props) {
   const rawId=useId(),prefix=rawId.replace(/[^\w-]/g,'');
   const slide=model.deck.slides[slideIndex],source=model.slides[slideIndex];
   const registry=new Map(source.nodes.map(node=>[node.id,node]));
   const {width,height}=model.deck.size;
   const sourceLists=slideLists(source.nodes,patches);
-  const childIds=new Set(source.nodes.flatMap(node=>node.children));
-  const listNodeKeys=new Set(sourceLists.flatMap(list=>list.items.flatMap(item=>item.nodes.map(n=>n.key))));
   const lists=interactive?sourceLists:[];
-  const hidden=new Set(lists.flatMap(list=>list.items.slice(listPreviewCount(list,listPreviews)).flatMap(item=>item.nodes.map(n=>n.key))));
+  const previews:ListLayoutTrial[]=listTrial?[listTrial]:[];
+  for(const list of lists){
+    const count=listPreviewCount(list,listPreviews);
+    const items=list.items.map(item=>({rootKeys:item.roots.map(root=>root.key),box:item.box}));
+    if(!listTrial&&list.grouped&&count!==list.items.length&&count<=100){
+      const plan=previewListLayout(list,count,patches);
+      if(plan)previews.push({items,slots:plan.slots});
+    }
+  }
+  const hidden=new Set(previews.flatMap(preview=>preview.items.flatMap(item=>item.rootKeys)));
   function renderElement(element:RenderElement,index:number,layout=false,instance=''):ReactNode {
     const node=!layout?registry.get(String(element.id)):undefined;
     if(node&&!instance&&hidden.has(node.key))return null;
@@ -106,7 +122,14 @@ export default function SvgSlide({model,slideIndex,patches,selected,selectedMemb
       else if(element.shapType==='ellipse')geometry=<ellipse cx={b.width/2} cy={b.height/2} rx={b.width/2} ry={b.height/2} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
       else if(element.shapType==='line'||b.height===0)geometry=<path d={`M0 0L${b.width} ${b.height}`} fill="none" stroke={stroke} strokeWidth={strokeWidth}/>;
       else geometry=<rect width={b.width} height={b.height} fill={paint} stroke={stroke} strokeWidth={strokeWidth}/>;
-      body=<><defs><PaintDefs paint={element.fill} id={pid} width={b.width} height={b.height}/></defs>{geometry}{element.content&&b.height>0&&!image&&<RichText html={element.content} textOutlines={element.textOutlines} width={b.width} height={b.height} element={element} preview={node?textPreviews[node.key]:undefined} workflowKey={!instance?node?.key:undefined} workflowScope={node&&node.kind==='sp'&&!childIds.has(node.id)&&!layout&&!instance&&!node.parentId&&!listNodeKeys.has(node.key)&&!node.rotation&&!element.rotate&&!node.flipH&&!node.flipV&&!element.isFlipH&&!element.isFlipV&&!node.dataKind&&!node.hasImage?'page-text':'unsupported'}/>}</>;
+      const workflowKey=node&&(instance?`${node.key}@${instance}`:node.key);
+      const measurable=node?.kind==='sp'&&!layout&&!node.rotation&&!element.rotate&&!node.flipH&&!node.flipV&&!element.isFlipH&&!element.isFlipV&&!node.dataKind&&!node.hasImage;
+      const preview=workflowKey===measurement?.key?measurement?.text:workflowKey?textPreviews[workflowKey]:undefined;
+      const showText=element.content||node?.hasTextBody&&preview!==undefined;
+      body=<><defs><PaintDefs paint={element.fill} id={pid} width={b.width} height={b.height}/></defs>{geometry}{showText&&b.height>0&&!image&&<RichText html={element.content??''} width={b.width} height={b.height} element={element}
+        preview={preview} workflowKey={workflowKey}
+        fixedFont={workflowKey!==undefined&&(fixedFontKey===workflowKey||measurement?.key===workflowKey||(node&&patches[node.key]?.fixedTextSize))} wrap={node?.textWrap!=='none'}
+        workflowScope={measurable?node.parentId||instance?'group-text':'page-text':'unsupported'}/>}</>;
     }else body=<g><rect width={b.width} height={b.height} fill="#f0ede8" stroke="#c5b999"/><text x="5" y="16" fontSize="10" fill="#756c58">{element.type}</text></g>;
     return <g key={key} id={node?`${prefix}-${instance}node-${node.id}`:undefined} transform={matrixString(m)} data-shape-id={node?.id} data-workflow-node-key={!instance?node?.key:undefined}>
       {body}
@@ -116,24 +139,47 @@ export default function SvgSlide({model,slideIndex,patches,selected,selectedMemb
   function findElement(elements:RenderElement[],id:string):RenderElement|undefined {
     for(const element of elements){if(String(element.id)===id)return element;const child=element.elements&&findElement(element.elements,id);if(child)return child;}
   }
+  const orderedElements=[...slide.elements].sort((a,b)=>(a.order||0)-(b.order||0));
+  const previewByAnchor=new Map<string,{preview:ListLayoutTrial;previewIndex:number}>();
+  previews.forEach((preview,previewIndex)=>{
+    const keys=new Set(preview.items.flatMap(item=>item.rootKeys));
+    const anchor=orderedElements.find(element=>{
+      const node=registry.get(String(element.id));
+      return node&&keys.has(node.key);
+    });
+    if(anchor)previewByAnchor.set(String(anchor.id),{preview,previewIndex});
+  });
   const selectedNode=source.nodes.find(node=>node.key===selected),selectedBox=selectedNode?boxFor(selectedNode,patches):null;
   return <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" className="pptx-svg" viewBox={`0 0 ${width} ${height}`} role={interactive?'application':'img'} aria-label={locale==='zh'?`第 ${slideIndex+1} 页 PPT`:`Slide ${slideIndex+1}`} onPointerDown={event=>{if(event.target===event.currentTarget)onSelect?.(null)}}>
     <defs><PaintDefs paint={slide.fill} id={`${prefix}-bg`} width={width} height={height}/></defs><rect width={width} height={height} fill={paintValue(slide.fill,`${prefix}-bg`)==='none'?'#fff':paintValue(slide.fill,`${prefix}-bg`)}/>
     {[...(slide.layoutElements||[])].sort((a,b)=>(a.order||0)-(b.order||0)).map((e,i)=>renderElement(e,i,true))}
-    {[...slide.elements].sort((a,b)=>(a.order||0)-(b.order||0)).map((e,i)=>renderElement(e,i))}
+    {orderedElements.flatMap((element,index)=>{
+      const anchored=previewByAnchor.get(String(element.id));
+      if(!anchored)return [renderElement(element,index)];
+      const {preview,previewIndex}=anchored;
+      return preview.slots.map((slot,slotIndex)=>{
+        const item=preview.items[slot.sourceIndex];
+        if(!item||item.box.width<=0||item.box.height<=0)return null;
+        const sx=slot.box.width/item.box.width,sy=slot.box.height/item.box.height;
+        const transform=matrixString([sx,0,0,sy,slot.box.x-item.box.x*sx,slot.box.y-item.box.y*sy]);
+        return <g key={`layout-${previewIndex}-${slotIndex}`} transform={transform} pointerEvents="none" data-workflow-list-slot={slotIndex}>
+          {item.rootKeys.map(key=>{
+            const node=source.nodes.find(node=>node.key===key);
+            const element=node&&findElement(slide.elements,node.id);
+            return element?renderElement(element,0,false,`list-${previewIndex}-${slotIndex}`):null;
+          })}
+        </g>;
+      });
+    })}
+    {listTrial?.slots.map(({box},i)=><rect key={i} x={box.x} y={box.y} width={box.width} height={box.height}
+      stroke={listTrial.conflicts?.includes(i)?'#bf222a':'#387777'} fill="none" vectorEffect="non-scaling-stroke"
+      strokeDasharray="4 3" pointerEvents="none"/>)}
     {lists.map((list,listIndex)=>{
       const count=listPreviewCount(list,listPreviews),active=list.items.some(item=>item.nodes.some(n=>n.key===selected)),b=list.box;
-      const first=list.items[0],last=list.items.at(-1)!;
-      const dx=list.items.length>1?(last.box.x-first.box.x)/(list.items.length-1):0;
-      const dy=list.items.length>1?(last.box.y-first.box.y)/(list.items.length-1):first.box.height+12;
       const title=`${locale==='zh'?'列表':'List'} ${String.fromCharCode(65+listIndex)} · ${list.dynamic?`${locale==='zh'?'可变':'Flexible'} ${list.min}–${list.max}`:`${locale==='zh'?'固定':'Fixed'} ${list.items.length}`}`;
       const labelY=Math.max(3,b.y-25),labelX=Math.max(3,b.x-5);
       return <g key={list.key} className="pptx-list-overlay">
         <rect x={b.x-5} y={b.y-5} width={b.width+10} height={b.height+10} rx="4" fill="none" stroke={list.color} strokeOpacity={active?.65:.25} strokeDasharray="5 4" pointerEvents="none"/>
-        {list.items.slice(0,count).map(item=><rect key={item.index} x={item.box.x-2} y={item.box.y-2} width={item.box.width+4} height={item.box.height+4} rx="3" fill={list.color} fillOpacity=".025" stroke={list.color} strokeOpacity=".23" pointerEvents="none"/>)}
-        {Array.from({length:Math.max(0,Math.min(100,count)-list.items.length)},(_,i)=>{
-          const step=list.items.length+i;return <g key={step} transform={`translate(${dx*step} ${dy*step})`} opacity=".48" pointerEvents="none">{first.roots.map(root=>{const element=findElement(slide.elements,root.id);return element?<g key={root.key} transform={matrixString(parentMatrix(root,source.nodes,patches))}>{renderElement(element,0,false,`preview-${list.index}-${step}-`)}</g>:null})}</g>;
-        })}
         <foreignObject x={labelX} y={labelY} width={Math.min(420,width-labelX)} height="24"><div className="pptx-list-badge" style={{borderColor:list.color+'88',color:`color-mix(in srgb, ${list.color} 60%, #1d2635)`}}><button onClick={()=>onSelectItem?.(list.controller.key)}>{title}</button>{active&&list.dynamic&&<><button aria-label={locale==='zh'?'减少预览项数':'Decrease preview items'} disabled={count<=list.min} onClick={()=>onListPreview?.(list.key,count-1)}>−</button><span>{count}</span><button aria-label={locale==='zh'?'增加预览项数':'Increase preview items'} disabled={count>=list.max} onClick={()=>onListPreview?.(list.key,count+1)}>+</button></>}</div></foreignObject>
       </g>;
     })}

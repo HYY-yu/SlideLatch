@@ -9,7 +9,11 @@ import * as session from '../lib/workflow/session.ts';
 import * as xml from '../lib/pptx/xml.ts';
 import * as recognition from '../lib/workflow/recognition.ts';
 import * as search from '../lib/workflow/constraint-search.ts';
-import * as lists from '../lib/pptx/lists.ts';
+import * as repeated from '../lib/workflow/repeated-elements.ts';
+import * as grouping from '../lib/pptx/grouping.ts';
+import * as dsl from '../lib/pptx/dsl.ts';
+import * as validation from '../lib/pptx/validation.ts';
+import * as textLength from '../packages/ppt-dsl/src/text-length.ts';
 Object.assign(globalThis,{DOMParser,XMLSerializer});
 
 async function model(){
@@ -27,12 +31,13 @@ function controller(source,{inspection=session.inspectWorkspace}={}){
   let index=0,dirty=false,applied,rendered;
   let props={model:source,patches:{},fileName:'marked.pptx',editorState:'initial',busy:false,currentSlideIndex:0,visibleProbeId:null,svgRef:{current:null},onApply:value=>{applied=value},onPreview:probe=>{props={...props,visibleProbeId:probe?.id??null};dirty=true},onCapacityPreview:()=>{},onError:message=>errors.push(message)};
   const react={
+    useId:()=>':studio-test:', useMemo:calculate=>calculate(),
     useState:initial=>{const slot=index++;if(!hooks[slot])hooks[slot]={value:initial};return [hooks[slot].value,value=>{hooks[slot].value=typeof value==='function'?value(hooks[slot].value):value;dirty=true}]},
     useRef:initial=>{const slot=index++;return hooks[slot]??(hooks[slot]={current:initial})},
     useEffect:(run,deps)=>{const slot=index++,old=effects[slot];if(!old||!deps||deps.some((value,i)=>value!==old.deps?.[i]))pending.push(()=>{old?.cleanup?.();effects[slot]={deps,cleanup:run()}})},
   };
   const code=ts.transpileModule(readFileSync(new URL('../components/pptx/workflow-controller.tsx',import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
-  const exports={},imports={react,'jszip':JSZip,'react-dom':{flushSync:action=>action()},'@/lib/workflow/recognition':recognition,'@/lib/workflow/constraint-search':search,'@/lib/workflow/measure-preview':{},'@/lib/pptx/lists':lists,'@/lib/pptx/xml':xml,'@/lib/workflow/session':{...session,inspectWorkspace:(...args)=>{const task=Promise.resolve().then(()=>inspection(...args));inspections.add(task);return task.finally(()=>inspections.delete(task))}}};
+  const exports={},imports={react,'jszip':JSZip,'react-dom':{flushSync:action=>action()},'@/lib/workflow/recognition':recognition,'@/lib/workflow/constraint-search':search,'@/lib/workflow/measure-preview':{},'react/jsx-runtime':{},'@/lib/workflow/repeated-elements':repeated,'@/lib/pptx/grouping':grouping,'@/lib/pptx/validation':validation,'@/lib/pptx/dsl':dsl,'@/packages/ppt-dsl/src/text-length':textLength,'@/lib/pptx/xml':xml,'@/lib/workflow/session':{...session,inspectWorkspace:(...args)=>{const task=Promise.resolve().then(()=>inspection(...args));inspections.add(task);return task.finally(()=>inspections.delete(task))}}};
   vm.runInNewContext(code,{exports,require:name=>{if(name in imports)return imports[name];throw new Error(name)},window:host,AbortController,crypto,Blob,Uint8Array,Error,console:{info:(...args)=>logs.push(args),error:(...args)=>logs.push(args)},URL:{createObjectURL:blob=>{const url=`blob:qa-${blobs.size}`;blobs.set(url,blob);return url},revokeObjectURL:url=>revoked.push(url)},document:{createElement:()=>({click(){downloads.push({url:this.href,name:this.download})}})}});
   async function flush(){
     for(let round=0;round<8;round++){

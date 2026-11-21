@@ -58,7 +58,7 @@ function applyParagraphOutline(paragraph: HTMLParagraphElement, source: TextOutl
 }
 
 /** The parser emits HTML. Rebuild an allowlisted fragment; never attach original HTML or events. */
-export function safeRichText(html:string,fontScale=1,preview?:string,outlines?:TextOutlineParagraph[]):string {
+export function safeRichText(html:string,fontScale=1,preview?:string,wrap=true,outlines?:TextOutlineParagraph[]):string {
   const doc=new DOMParser().parseFromString(html,'text/html');
   const clean=(node:Node):Node=>{
     if(node.nodeType===3)return doc.createTextNode(node.textContent||'');
@@ -103,7 +103,8 @@ export function safeRichText(html:string,fontScale=1,preview?:string,outlines?:T
     const first=wrapper.querySelector('span')||wrapper.querySelector('p')||wrapper;
     const run=first.cloneNode(false) as HTMLElement;
     run.textContent=preview;
-    run.style.whiteSpace='pre-wrap';
+    run.setAttribute('data-workflow-sample','');
+    run.style.whiteSpace=wrap?'pre-wrap':'pre';
     const paragraph=wrapper.querySelector('p')?.cloneNode(false) as HTMLElement|undefined;
     wrapper.replaceChildren();
     if(paragraph&&first.localName!=='p'){paragraph.appendChild(run);wrapper.appendChild(paragraph);}

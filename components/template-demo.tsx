@@ -12,7 +12,7 @@ import { validateWorkspace } from '@/lib/pptx/validation';
 import { boxFor, inverse, parentMatrix, point, worldFrame } from '@/lib/pptx/geometry';
 import { markError, markName, parseMark, type Mark } from '@/lib/pptx/dsl';
 import type { Box, LoadedTemplate, Patches, SourceNode } from '@/lib/pptx/types';
-import SvgSlide from './pptx/svg-slide';
+import SvgSlide, {type ListLayoutTrial} from './pptx/svg-slide';
 import WorkflowController from './pptx/workflow-controller';
 import StudioShell from './studio/studio-shell';
 import { locateAuthorIssue } from '@/lib/workflow/studio-issue';
@@ -46,7 +46,8 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
   const objectListRef=useRef<HTMLDivElement>(null),selectedObjectRef=useRef<HTMLButtonElement>(null);
   const [listPreviews,setListPreviews]=useState<Record<string,number>>({});
   const [workflowPreview,setWorkflowPreview]=useState<BoundaryProbe|null>(null);
-  const [capacityPreview,setCapacityPreview]=useState<{key:string;text:string}|null>(null);
+  const [capacityPreview,setCapacityPreview]=useState<{key:string;text?:string}|null>(null);
+  const [listTrial,setListTrial]=useState<ListLayoutTrial|null>(null);
   const patches=transient||history.current;
   const source=model?.slides[page];
   const node=source?.nodes.find(node=>node.key===selected);
@@ -110,9 +111,8 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
       else if(edited!==undefined)result[n.key]=edited;
     }
     if(workflowPreview?.kind==='text')result[workflowPreview.key]=workflowPreview.text??'';
-    if(capacityPreview)result[capacityPreview.key]=capacityPreview.text;
     return result;
-  },[model,previewLengths,history.current,contentDraft,workflowPreview,capacityPreview]);
+  },[model,previewLengths,history.current,contentDraft,workflowPreview]);
   const mark=parseMark(nameDraft),draftInvalid=markError(mark);
   const hasMark=currentName.trim().startsWith('@');
   useEffect(()=>setNameDraft(currentName),[selected,currentName]);
@@ -275,6 +275,7 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
     }catch(cause){track('workbench_export_failed',{reason:'write_failed'});console.error('[SlideLatch] template.export.failed',cause);setError(t.error);}finally{setExporting(false);}
   }
   const properties = model && source ? (<aside className="pptx-properties">
+
             <section className="pptx-objects-region" aria-label={t.objects}>
             <div className="pptx-object-header"><h3>{t.objects}</h3><label><input type="checkbox" checked={markedOnly} onChange={e=>setMarkedOnly(e.target.checked)}/>{t.markedOnly}</label></div>
             <div className="pptx-object-list" ref={objectListRef}><ListObjects nodes={source.nodes} lists={lists} patches={history.current} selected={selected} markedOnly={markedOnly} onSelect={selectObject} onSelectItem={selectListItem} selectedRef={selectedObjectRef} locale={locale}/></div>
@@ -293,12 +294,21 @@ export default function TemplateDemo({locale,mode='demo'}:{locale:Locale;mode?:'
               <button className="pptx-apply" disabled={draftInvalid||(nameDraft===currentName&&!contentDirty)} onClick={()=>updateNode({name:nameDraft,...(contentDirty?{text:nodeContent}:{})})}>{t.apply} ✓</button></>}</>}
             </section>:<section className="pptx-inspector-body" aria-label={t.mark}><h3>{t.mark}</h3><p className="pptx-empty">{t.select}</p></section>}
           </aside>) : null;
-  if(mode==='studio')return <>{model&&<WorkflowController editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])} svgRef={svgRef} onCapacityPreview={setCapacityPreview} key={fileSession} model={model} patches={history.current} fileName={fileName} visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page} busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName} onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}} onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}} onError={setError}/>}<StudioShell
+  if(mode==='studio')return <><StudioShell
+    workflow={model&&<WorkflowController key={fileSession} locale={locale} selectedKey={selected}
+              editorState={JSON.stringify([phase,selected,nameDraft,contentDraft,previewLengths,listPreviews])}
+              svgRef={svgRef} onCapacityPreview={setCapacityPreview} onListTrial={setListTrial}
+              model={model} patches={history.current} fileName={fileName}
+              visibleProbeId={workflowPreview?.id??null} currentSlideIndex={page}
+              busy={loading||exporting||!!transient||!!groupMode||contentDirty||nameDraft!==currentName}
+              onApply={next=>{commit(next);setContentDraft(null);setPreviewLengths({});setListPreviews({});}}
+              onPreview={probe=>{setWorkflowPreview(probe);setPreviewLengths({});setListPreviews({});if(probe){setPage(probe.slideIndex);setSelected(probe.key);setSelectionKind('node');}}}
+              onError={setError}/>}
     locale={locale} model={model} fileName={fileName} loading={loading} busy={exporting||!!transient||!!groupMode} error={error}
     page={page} committedPatches={history.current} textPreviews={textPreviews}
     properties={properties} onLocateIssue={issue=>{const target=model?locateAuthorIssue(model.slides,issue):null;if(target){changePage(target.page);if(target.key)selectObject(target.key)}}} onPage={changePage} onOpen={()=>inputRef.current?.click()} onRetry={openTemplate}
     input={<input ref={inputRef} type="file" accept=".pptx" hidden aria-label={locale==='zh'?'选择本地 PPTX':'Choose local PPTX'} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void openLocalFile(file)}}/>}
-    canvas={model&&<SvgSlide model={model} slideIndex={page} patches={patches} selected={groupMode?null:selected} selectedMembers={groupMode?.keys} interactive onSelect={selectObject} onSelectItem={selectListItem} onDrag={drag} svgRef={svgRef} locale={locale} textPreviews={textPreviews} listPreviews={workflowPreview?.kind==='list'&&workflowPreview.listKey?{[workflowPreview.listKey]:workflowPreview.value}:listPreviews} onListPreview={previewList}/>}
+    canvas={model&&<SvgSlide model={model} slideIndex={page} patches={patches} selected={groupMode?null:selected} selectedMembers={groupMode?.keys} interactive onSelect={selectObject} onSelectItem={selectListItem} onDrag={drag} svgRef={svgRef} locale={locale} textPreviews={textPreviews} measurement={capacityPreview} fixedFontKey={workflowPreview?.kind==='text'?workflowPreview.key:undefined} listTrial={listTrial} listPreviews={workflowPreview?.kind==='list'&&workflowPreview.listKey?{[workflowPreview.listKey]:workflowPreview.value}:listPreviews} onListPreview={previewList}/>}
     actions={<><button disabled={!history.past.length||exporting} onClick={undo}>↶ {t.undo}</button><button disabled={!history.future.length||exporting} onClick={redo}>↷ {t.redo}</button><button disabled={!node||!history.current[node.key]?.box||exporting} onClick={resetPosition}>{t.resetPosition}</button><button disabled={(!patchCount&&!Object.keys(listPreviews).length&&!Object.keys(previewLengths).length&&!contentDirty&&nameDraft===currentName)||exporting} onClick={resetAll}>{t.resetAll}</button></>}
     issues={model?[...model.mappingWarnings,...exportIssues.map(issueText)]:[]}
     onExport={()=>void exportTemplate(pendingExportPatches)} exportBlocked={!!exportBlocked||!!groupMode||!!transient||exporting} exporting={exporting}

@@ -117,6 +117,9 @@ export async function readSourceSlides(bytes: ArrayBuffer | Uint8Array, options?
           const match = /^val\s+(-?\d+(?:\.\d+)?)$/.exec(guide.getAttribute('fmla') || '');
           if (match) adjustments[guide.getAttribute('name') || ''] = Number(match[1]);
         }
+        const textBody = child(shape,'txBody');
+        const bodyProperties = textBody && child(textBody,'bodyPr');
+        const wrap = bodyProperties?.getAttribute('wrap');
         const textOutlines = options?.textOutlines ? readTextOutlines(shape, schemeColor) : [];
         const node: SourceNode = {
           key: `${path}#${id}`, slidePath:path, id, name, kind:shape.localName, parentId,
@@ -127,7 +130,9 @@ export async function readSourceSlides(bytes: ArrayBuffer | Uint8Array, options?
           geometry:preset?{preset:preset.getAttribute('prst') || '',adjustments}:undefined,
           ...(textOutlines.length ? { textOutlines } : {}),
           hasImage:shape.localName==='pic'||!!(properties&&child(properties,'blipFill')),
-          hasTextBody:!!child(shape,'txBody'),
+          hasTextBody:!!textBody,
+          ...(wrap==='none'||wrap==='square'?{textWrap:wrap}:{}),
+          ...(bodyProperties&&child(bodyProperties,'normAutofit')?{hasAutoShrink:true}:{}),
           dataKind:descendants(shape,NS.a,'graphicData')[0]?.getAttribute('uri')?.endsWith('/table')?'table':descendants(shape,NS.a,'graphicData')[0]?.getAttribute('uri')?.endsWith('/chart')?'chart':undefined,
         };
         nodes.push(node);
@@ -255,6 +260,13 @@ export async function writePptx(bytes: ArrayBuffer | Uint8Array, patches: Patche
         props.setAttribute('name',patch.name);
       }
       if (patch.text !== undefined) writeShapeText(shape, patch.text.replace(/\r\n?/g, '\n'));
+      if (patch.fixedTextSize) {
+        const body = shape.localName==='sp'&&child(shape,'txBody');
+        const bodyProperties = body&&child(body,'bodyPr');
+        const autoFit = bodyProperties&&child(bodyProperties,'normAutofit');
+        if (!bodyProperties || !autoFit) throw new Error(`PATCH_TEXT_AUTOFIT: ${path}#${id}`);
+        bodyProperties.replaceChild(doc.createElementNS(NS.a,'a:noAutofit'),autoFit);
+      }
       if (patch.box) {
         validateBox(patch.box);
         const xfrm = transform(shape);
